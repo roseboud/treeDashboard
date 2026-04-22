@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "Points_with_Classifcation_Area2",
+"xy_coordinate_resolution": 1e-07,
+"features": [
+{ "type": "Feature", "properties": { "Point_ID": "STRESSTREEB008", "X": 364738.757, "Y": 4958958.083, "Ortho": 244.828, "Sep": -21.121, "SD_X": 0.48, "SD_Y": 0.796, "SD_Z": 0.808, "OBJECTID_1": 8, "Point_ID_1": "STRESSTREEB008", "ZONE_CODE": 8, "COUNT": 16355.0, "AREA": 7.0567897183200001, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7093873, 44.7712336, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "STRESSTREEB010", "X": 364714.095, "Y": 4958937.789, "Ortho": 245.928, "Sep": -21.121, "SD_X": 0.492, "SD_Y": 0.849, "SD_Z": 0.772, "OBJECTID_1": 10, "Point_ID_1": "STRESSTREEB010", "ZONE_CODE": 10, "COUNT": 16353.0, "AREA": 7.0559267663499998, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7096935, 44.7710463, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD004", "X": 364779.011, "Y": 4958946.314, "Ortho": 249.761, "Sep": -21.121, "SD_X": 0.656, "SD_Y": 0.981, "SD_Z": 0.767, "OBJECTID_1": 36, "Point_ID_1": "StreeTreeD004", "ZONE_CODE": 36, "COUNT": 16357.0, "AREA": 7.0576526702900004, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7088757, 44.7711353, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD087", "X": 364595.912, "Y": 4958991.005, "Ortho": 239.601, "Sep": -21.119, "SD_X": 0.52, "SD_Y": 0.774, "SD_Z": 0.893, "OBJECTID_1": 119, "Point_ID_1": "StreeTreeD087", "ZONE_CODE": 119, "COUNT": 16349.0, "AREA": 7.0542008624200001, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7112005, 44.7715028, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD119", "X": 364688.197, "Y": 4959075.02, "Ortho": 242.51, "Sep": -21.117, "SD_X": 0.54, "SD_Y": 0.711, "SD_Z": 1.148, "OBJECTID_1": 151, "Point_ID_1": "StreeTreeD119", "ZONE_CODE": 151, "COUNT": 16352.0, "AREA": 7.0554952903699997, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7100571, 44.7722762, 0.0 ] } }
+]
+}

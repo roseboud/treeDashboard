@@ -1,0 +1,12 @@
+{
+"type": "FeatureCollection",
+"name": "Points_with_Classifcation_Area2",
+"xy_coordinate_resolution": 1e-07,
+"features": [
+{ "type": "Feature", "properties": { "Point_ID": "STRESSTREEB009", "X": 364733.315, "Y": 4958959.794, "Ortho": 244.57, "Sep": -21.121, "SD_X": 0.501, "SD_Y": 0.808, "SD_Z": 0.791, "OBJECTID_1": 9, "Point_ID_1": "STRESSTREEB009", "ZONE_CODE": 9, "COUNT": 16354.0, "AREA": 7.05635824234, "MAJORITY": 1 }, "geometry": { "type": "Point", "coordinates": [ -64.7094565, 44.7712479, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "STRESSTREEB013", "X": 364674.859, "Y": 4958939.481, "Ortho": 244.514, "Sep": -21.121, "SD_X": 0.588, "SD_Y": 1.077, "SD_Z": 0.994, "OBJECTID_1": 13, "Point_ID_1": "STRESSTREEB013", "ZONE_CODE": 13, "COUNT": 16352.0, "AREA": 7.0554952903699997, "MAJORITY": 1 }, "geometry": { "type": "Point", "coordinates": [ -64.7101896, 44.7710541, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD006", "X": 364703.831, "Y": 4958920.478, "Ortho": 242.311, "Sep": -21.122, "SD_X": 0.557, "SD_Y": 0.878, "SD_Z": 0.835, "OBJECTID_1": 38, "Point_ID_1": "StreeTreeD006", "ZONE_CODE": 38, "COUNT": 16351.0, "AREA": 7.0550638143800004, "MAJORITY": 1 }, "geometry": { "type": "Point", "coordinates": [ -64.7098185, 44.7708886, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD025", "X": 364337.859, "Y": 4958928.593, "Ortho": 220.739, "Sep": -21.12, "SD_X": 0.492, "SD_Y": 0.958, "SD_Z": 0.574, "OBJECTID_1": 57, "Point_ID_1": "StreeTreeD025", "ZONE_CODE": 57, "COUNT": 16355.0, "AREA": 7.0567897183200001, "MAJORITY": 1 }, "geometry": { "type": "Point", "coordinates": [ -64.7144436, 44.7708923, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD078", "X": 364468.15, "Y": 4958955.155, "Ortho": 224.755, "Sep": -21.119, "SD_X": 0.401, "SD_Y": 0.566, "SD_Z": 0.638, "OBJECTID_1": 110, "Point_ID_1": "StreeTreeD078", "ZONE_CODE": 110, "COUNT": 16354.0, "AREA": 7.05635824234, "MAJORITY": 1 }, "geometry": { "type": "Point", "coordinates": [ -64.7128049, 44.771156, 0.0 ] } }
+]
+}

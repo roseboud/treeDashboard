@@ -1,0 +1,5 @@
+# Ignore the 3.78GB file that exceeds GitHub's 2GB limit
+data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_NoHoleFilling_Fill_RC_Ortho_Cog.tif
+
+# Ignore any other potentially large files
+*.zip

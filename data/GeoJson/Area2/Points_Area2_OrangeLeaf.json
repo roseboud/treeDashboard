@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "Points_with_Classifcation_Area2",
+"xy_coordinate_resolution": 1e-07,
+"features": [
+{ "type": "Feature", "properties": { "Point_ID": "STRESSTREEC067", "X": 364449.614, "Y": 4959063.549, "Ortho": 222.516, "Sep": -21.116, "SD_X": 0.409, "SD_Y": 0.675, "SD_Z": 0.724, "OBJECTID_1": 21, "Point_ID_1": "STRESSTREEC067", "ZONE_CODE": 21, "COUNT": 16348.0, "AREA": 7.05376938643, "MAJORITY": 2 }, "geometry": { "type": "Point", "coordinates": [ -64.7130679, 44.7721278, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD001", "X": 364799.291, "Y": 4958947.224, "Ortho": 246.908, "Sep": -21.121, "SD_X": 0.414, "SD_Y": 0.612, "SD_Z": 0.579, "OBJECTID_1": 33, "Point_ID_1": "StreeTreeD001", "ZONE_CODE": 33, "COUNT": 16355.0, "AREA": 7.0567897183200001, "MAJORITY": 2 }, "geometry": { "type": "Point", "coordinates": [ -64.7086198, 44.7711473, 0.0 ] } },
+{ "type": "Feature", "properties": { "Point_ID": "StreeTreeD127", "X": 364727.612, "Y": 4959097.13, "Ortho": 242.601, "Sep": -21.116, "SD_X": 0.461, "SD_Y": 0.691, "SD_Z": 0.863, "OBJECTID_1": 159, "Point_ID_1": "StreeTreeD127", "ZONE_CODE": 159, "COUNT": 16353.0, "AREA": 7.0559267663499998, "MAJORITY": 2 }, "geometry": { "type": "Point", "coordinates": [ -64.709565, 44.7724827, 0.0 ] } }
+]
+}
