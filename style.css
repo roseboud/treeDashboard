@@ -1,0 +1,45 @@
+
+body { margin:0; padding:0; font-family:Arial, sans-serif; }
+#map { position:absolute; top:0; bottom:0; width:100%; }
+
+.legend {
+    background: white;
+    padding: 10px;
+    border-radius: 4px;
+    line-height: 20px;
+}
+.legend i {
+    width: 18px;
+    height: 18px;
+    float: left;
+    margin-right: 8px;
+    opacity: 0.8;
+}
+
+.stats-panel {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: white;
+    padding: 12px;
+    border-radius: 4px;
+    z-index: 1000;
+    min-width: 180px;
+    box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+}
+.stats-panel h4 { margin: 0 0 8px 0; }
+.stats-panel p { margin: 4px 0; font-size:13px; }
+
+.disclaimer {
+    position: absolute;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255,255,255,0.9);
+    padding: 8px 12px;
+    border-radius: 4px;
+    z-index: 1000;
+    font-size: 12px;
+    max-width: 600px;
+    text-align: center;
+}
