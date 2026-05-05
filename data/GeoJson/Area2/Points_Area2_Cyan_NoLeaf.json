@@ -1,7 +1,7 @@
 {
 "type": "FeatureCollection",
-"name": "Points_with_Classifcation_Area2",
-"xy_coordinate_resolution": 1e-07,
+"name": "Points_Area2_Cyan_NoLeaf",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
 "features": [
 { "type": "Feature", "properties": { "Point_ID": "STRESSTREEC071", "X": 364339.591, "Y": 4959024.606, "Ortho": 213.737, "Sep": -21.117, "SD_X": 0.353, "SD_Y": 0.55, "SD_Z": 0.628, "OBJECTID_1": 23, "Point_ID_1": "STRESSTREEC071", "ZONE_CODE": 23, "COUNT": 16351.0, "AREA": 7.0550638143800004, "MAJORITY": 5 }, "geometry": { "type": "Point", "coordinates": [ -64.7144473, 44.7717566, 0.0 ] } }
 ]

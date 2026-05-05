@@ -3,3 +3,5 @@ data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_No
 
 # Ignore any other potentially large files
 *.zip
+
+data/Working_Tiff_Layers/
