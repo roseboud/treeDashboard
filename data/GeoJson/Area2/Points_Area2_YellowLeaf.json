@@ -1,7 +1,7 @@
 {
 "type": "FeatureCollection",
-"name": "Points_with_Classifcation_Area2",
-"xy_coordinate_resolution": 1e-07,
+"name": "Points_Area2_YellowLeaf",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
 "features": [
 { "type": "Feature", "properties": { "Point_ID": "STRESSTREEB008", "X": 364738.757, "Y": 4958958.083, "Ortho": 244.828, "Sep": -21.121, "SD_X": 0.48, "SD_Y": 0.796, "SD_Z": 0.808, "OBJECTID_1": 8, "Point_ID_1": "STRESSTREEB008", "ZONE_CODE": 8, "COUNT": 16355.0, "AREA": 7.0567897183200001, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7093873, 44.7712336, 0.0 ] } },
 { "type": "Feature", "properties": { "Point_ID": "STRESSTREEB010", "X": 364714.095, "Y": 4958937.789, "Ortho": 245.928, "Sep": -21.121, "SD_X": 0.492, "SD_Y": 0.849, "SD_Z": 0.772, "OBJECTID_1": 10, "Point_ID_1": "STRESSTREEB010", "ZONE_CODE": 10, "COUNT": 16353.0, "AREA": 7.0559267663499998, "MAJORITY": 3 }, "geometry": { "type": "Point", "coordinates": [ -64.7096935, 44.7710463, 0.0 ] } },
