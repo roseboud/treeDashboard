@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Hutchinson Acres — 3D Tree Health Viewer</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- CesiumJS -->
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css" rel="stylesheet">
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=DM+Mono:wght@300;400&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --forest:   #1a1f1a;
+      --canopy:   #2e3a2e;
+      --leaf:     #7ab87a;
+      --pale:     #b0c8b0;
+      --muted:    #5a7a5a;
+      --healthy:  #2ecc71;
+      --mild:     #f1c40f;
+      --moderate: #e67e22;
+      --high:     #e74c3c;
+      --leafless: #3498db;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--forest);
+      font-family: 'DM Mono', monospace;
+      color: var(--pale);
+      overflow: hidden;
+    }
+
+    /* ── Layout ───────────────────────────────────────── */
+    #app {
+      display: flex;
+      height: 100%;
+      width: 100%;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    #sidebar {
+      width: 260px;
+      min-width: 260px;
+      background: var(--forest);
+      border-right: 1px solid var(--canopy);
+      display: flex;
+      flex-direction: column;
+      z-index: 100;
+    }
+
+    #sidebar-header {
+      padding: 20px 18px 16px;
+      border-bottom: 1px solid var(--canopy);
+    }
+
+    .nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      text-decoration: none;
+      margin-bottom: 14px;
+      transition: color 0.15s;
+    }
+
+    .nav-back:hover { color: var(--leaf); }
+
+    .nav-back::before {
+      content: '←';
+      font-size: 12px;
+    }
+
+    #sidebar-header h1 {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 22px;
+      font-weight: 300;
+      color: #e8ede8;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    #sidebar-header h2 {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--leaf);
+      font-weight: 400;
+    }
+
+    #sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    #sidebar-body::-webkit-scrollbar { width: 3px; }
+    #sidebar-body::-webkit-scrollbar-thumb { background: var(--canopy); }
+
+    /* ── Sections ─────────────────────────────────────── */
+    .section {
+      padding: 14px 18px;
+      border-bottom: 1px solid var(--canopy);
+    }
+
+    .section-title {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 12px;
+    }
+
+    /* ── Camera presets ───────────────────────────────── */
+    .camera-btn {
+      width: 100%;
+      background: #222922;
+      border: 1px solid var(--canopy);
+      border-radius: 3px;
+      padding: 8px 10px;
+      color: var(--pale);
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      text-align: left;
+      cursor: pointer;
+      margin-bottom: 5px;
+      transition: all 0.15s;
+      letter-spacing: 0.03em;
+    }
+
+    .camera-btn:hover {
+      border-color: var(--leaf);
+      color: var(--leaf);
+    }
+
+    .camera-btn:last-child { margin-bottom: 0; }
+
+    /* ── Legend ───────────────────────────────────────── */
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: var(--pale);
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Info panel ───────────────────────────────────── */
+    .info-text {
+      font-size: 11px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-style: italic;
+    }
+
+    .info-text strong {
+      color: var(--pale);
+      font-style: normal;
+      font-weight: 400;
+    }
+
+    /* ── Controls ─────────────────────────────────────── */
+    .control-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .control-label {
+      font-size: 10px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      width: 60px;
+      flex-shrink: 0;
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 2px;
+      background: var(--canopy);
+      border-radius: 1px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--leaf);
+      cursor: pointer;
+    }
+
+    .control-val {
+      font-size: 10px;
+      color: var(--muted);
+      width: 30px;
+      text-align: right;
+    }
+
+    /* ── Cesium viewer ────────────────────────────────── */
+    #cesium-container {
+      flex: 1;
+      position: relative;
+    }
+
+    #cesiumContainer {
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Hide Cesium branding/credits bar */
+    .cesium-widget-credits { display: none !important; }
+    .cesium-viewer-bottom { display: none !important; }
+
+    /* ── Overlay badge ────────────────────────────────── */
+    #mode-badge {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(26,31,26,0.88);
+      border: 1px solid var(--canopy);
+      border-radius: 3px;
+      padding: 5px 12px;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--leaf);
+      pointer-events: none;
+    }
+
+    /* ── Loading overlay ──────────────────────────────── */
+    #loading {
+      position: absolute;
+      inset: 0;
+      background: var(--forest);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      transition: opacity 0.6s;
+    }
+
+    #loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loading-title {
+      font-family: 'Cormorant Garamond', serif;
+      font-size: 28px;
+      font-weight: 300;
+      color: #e8ede8;
+      margin-bottom: 6px;
+    }
+
+    .loading-sub {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .loading-bar-track {
+      width: 160px;
+      height: 2px;
+      background: var(--canopy);
+      border-radius: 1px;
+      overflow: hidden;
+    }
+
+    .loading-bar-fill {
+      height: 100%;
+      background: var(--leaf);
+      border-radius: 1px;
+      animation: load 2s ease forwards;
+    }
+
+    @keyframes load {
+      from { width: 0% }
+      to   { width: 100% }
+    }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── Sidebar ──────────────────────────────────────── -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <a href="index.html" class="nav-back">2D Dashboard</a>
+      <h1>Hutchinson Acres</h1>
+      <h2>3D Tree Viewer</h2>
+    </div>
+
+    <div id="sidebar-body">
+
+      <!-- Camera presets -->
+      <div class="section">
+        <div class="section-title">Camera Views</div>
+        <button class="camera-btn" onclick="flyToOverview()">Overview — Both Areas</button>
+        <button class="camera-btn" onclick="flyToArea1()">Area 1 — Close Up</button>
+        <button class="camera-btn" onclick="flyToArea2()">Area 2 — Field Points</button>
+        <button class="camera-btn" onclick="flyToOblique()">Oblique — Side View</button>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px">
+          <button class="camera-btn" onclick="zoomIn()" style="text-align:center">+ Zoom In</button>
+          <button class="camera-btn" onclick="zoomOut()" style="text-align:center">− Zoom Out</button>
+        </div>
+      </div>
+
+      <!-- Terrain controls -->
+      <div class="section">
+        <div class="section-title">Terrain</div>
+        <div class="control-row">
+          <span class="control-label">Exaggeration</span>
+          <input type="range" id="terrain-exag" min="1" max="5" step="0.5" value="1">
+          <span class="control-val" id="terrain-exag-val">1×</span>
+        </div>
+      </div>
+
+      <!-- Legend -->
+      <div class="section">
+        <div class="section-title">Leaf Stress</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--healthy)"></div>Healthy (Green)</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--mild)"></div>Mild Stress</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--moderate)"></div>Moderate Stress</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--high)"></div>High Stress</div>
+        <div class="legend-row"><div class="legend-dot" style="background:var(--leafless)"></div>Leafless</div>
+      </div>
+
+      <!-- About -->
+      <div class="section">
+        <div class="section-title">About This View</div>
+        <p class="info-text">
+          The 3D scene shows <strong>terrain elevation</strong> derived from drone lidar.
+          Tree crown colours represent <strong>leaf stress classification</strong> from RGB drone imagery.
+          <br><br>
+          This view shows <strong>where</strong> stressed trees are located — not why they are stressed.
+          Below-ground factors such as soil condition and root health are likely more significant.
+        </p>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Cesium viewer ──────────────────────────────── -->
+  <div id="cesium-container">
+    <div id="cesiumContainer"></div>
+    <div id="mode-badge">3D Terrain View</div>
+
+    <!-- Loading screen -->
+    <div id="loading">
+      <div class="loading-title">Hutchinson Acres</div>
+      <div class="loading-sub">Loading 3D Scene</div>
+      <div class="loading-bar-track">
+        <div class="loading-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/*
+==========================================================
+  HOW THE 3D VIEWER WORKS
+==========================================================
+
+  CesiumJS renders a 3D globe in the browser. We:
+
+  1. Set the view to the Hutchinson Acres study area in
+     Kings County, Nova Scotia.
+
+  2. Load Cesium World Terrain for the base elevation.
+     This gives a realistic 3D ground surface globally.
+     The drone lidar DEM would replace/refine this once
+     the raster data hosting is sorted with the team.
+
+  3. Add tree crown polygons as 3D extruded shapes,
+     coloured by their leaf stress classification.
+     Height is estimated from the NHM (normalized height
+     model) — each polygon is extruded to the average
+     canopy height for that class (roughly 15-25m for
+     mature sugar maples).
+
+  4. Add field points as 3D cylinders (flag markers)
+     so the flagged low-sap trees are visible in 3D.
+
+  5. Camera preset buttons fly to different viewpoints
+     over the study area.
+
+  NOTE: This is a skeleton/prototype. The real terrain
+  layer would come from the drone lidar COG files served
+  via TiTiler once the team resolves the raster hosting.
+==========================================================
+*/
+
+// ── Cesium ion token ──────────────────────────────────
+// Using the default free token for terrain.
+// The team should register at cesium.com and add their
+// own token here for production use.
+Cesium.Ion.defaultAccessToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiJiYzhkNGUxZi03YmFiLTQ1NzctOTk3Yy1hMTg0MzY0NmI0ZGYiLCJpZCI6NDI4MDcwLCJpc3MiOiJodHRwczovL2lvbi5jZXNpdW0uY29tIiwiYXVkIjoidW5kZWZpbmVkX2RlZmF1bHQiLCJpYXQiOjE3NzgwOTIxNTB9.tOwNa1DnIx1Mdjz5EYDz1hoKLqHKI9lUvM_nPTdB-7w';
+
+// ── Study area coordinates ────────────────────────────
+// Centre of Hutchinson Acres study area, Kings County NS
+const CENTRE_LON = -64.715021;
+const CENTRE_LAT = 44.768894;
+
+// Area 1 approximate centre
+const AREA1_LON = -64.718847;
+const AREA1_LAT = 44.766271;
+
+// Area 2 approximate centre
+const AREA2_LON = -64.711194;
+const AREA2_LAT = 44.771517;
+
+// ── Stress colours ────────────────────────────────────
+const STRESS_COLORS = {
+  green:  Cesium.Color.fromCssColorString('#2ecc71').withAlpha(0.85),
+  yellow: Cesium.Color.fromCssColorString('#f1c40f').withAlpha(0.85),
+  orange: Cesium.Color.fromCssColorString('#e67e22').withAlpha(0.85),
+  red:    Cesium.Color.fromCssColorString('#e74c3c').withAlpha(0.85),
+  teal:   Cesium.Color.fromCssColorString('#3498db').withAlpha(0.85)
+};
+
+// ── Init Cesium viewer ────────────────────────────────
+const viewer = new Cesium.Viewer('cesiumContainer', {
+  baseLayerPicker: false,
+  geocoder: false,
+  homeButton: false,
+  sceneModePicker: false,
+  navigationHelpButton: false,
+  animation: false,
+  timeline: false,
+  fullscreenButton: false,
+  infoBox: true,
+  selectionIndicator: true,
+  shadows: false
+});
+
+// Prevent terrain clipping issues
+viewer.scene.globe.depthTestAgainstTerrain = false;
+
+// Restore default atmosphere
+viewer.scene.skyAtmosphere.show = true;
+
+
+// Cesium 1.114 compatible terrain loading
+(async function() {
+  try {
+    viewer.terrainProvider = await Cesium.createWorldTerrainAsync();
+
+    console.log('Terrain loaded successfully');
+
+    // Wait briefly before camera movement
+    setTimeout(() => {
+      flyToOverview();
+    }, 1000);
+
+  } catch (err) {
+    console.error('Terrain failed to load:', err);
+  }
+})();
+
+
+// Terrain initialized using Cesium 1.114 compatible async API
+
+// Using default Cesium imagery for stability// Using default Cesium scene colors// Terrain exaggeration
+viewer.scene.verticalExaggeration = 1.0;
+
+viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(remaining) {
+  console.log('Remaining terrain tiles:', remaining);
+});
+
+viewer.scene.renderError.addEventListener(function(error) {
+  console.error('Cesium render error:', error);
+});
+
+
+
+viewer.scene.renderError.addEventListener(function(error) {
+  console.error('Cesium render error:', error);
+});
+
+viewer.scene.globe.tileLoadProgressEvent.addEventListener(function(remaining) {
+  if (remaining === 0) {
+    console.log('All terrain tiles loaded');
+  }
+});
+
+
+// ── Camera presets ────────────────────────────────────
+function flyToOverview() {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(CENTRE_LON, CENTRE_LAT, 1800),
+
+    orientation: {
+      heading: 0,
+      pitch: Cesium.Math.toRadians(-45),
+      roll: 0
+    },
+
+    duration: 0
+  });
+}
+
+function flyToArea1() {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(AREA1_LON, AREA1_LAT - 0.005, 500),
+    orientation: {
+      heading: Cesium.Math.toRadians(15),
+      pitch:   Cesium.Math.toRadians(-35),
+      roll:    0
+    },
+    duration: 2
+  });
+}
+
+function flyToArea2() {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(AREA2_LON, AREA2_LAT - 0.005, 500),
+    orientation: {
+      heading: Cesium.Math.toRadians(-10),
+      pitch:   Cesium.Math.toRadians(-35),
+      roll:    0
+    },
+    duration: 2
+  });
+}
+
+function flyToOblique() {
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(CENTRE_LON - 0.012, CENTRE_LAT - 0.008, 700),
+    orientation: {
+      heading: Cesium.Math.toRadians(45),
+      pitch:   Cesium.Math.toRadians(-25),
+      roll:    0
+    },
+    duration: 2
+  });
+}
+
+// ── Terrain exaggeration slider ───────────────────────
+document.getElementById('terrain-exag').addEventListener('input', function() {
+  const val = parseFloat(this.value);
+  viewer.scene.verticalExaggeration = val;
+  document.getElementById('terrain-exag-val').textContent = val + '×';
+});
+
+function zoomIn() {
+  const camera = viewer.camera;
+  camera.zoomIn(camera.positionCartographic.height * 0.4);
+}
+
+function zoomOut() {
+  const camera = viewer.camera;
+  camera.zoomOut(camera.positionCartographic.height * 0.5);
+}
+
+// ── Load GeoJSON tree polygons as 3D entities ─────────
+/*
+  Each tree polygon is extruded to a height based on its
+  stress class. In a full build this would use the actual
+  NHM values from the lidar data. For now we use estimated
+  average canopy heights for sugar maples in Nova Scotia:
+    Healthy:  20-25m  → extrude to 22m
+    Stressed: 15-20m  → extrude to 17m
+    Leafless: 10-15m  → extrude to 12m
+*/
+const classHeights = {
+  Green:  22,
+  Yellow: 18,
+  Orange: 17,
+  Red:    15,
+  NoLeaf: 12
+};
+
+async function loadTreePolygons(path, colorKey, heightKey) {
+  try {
+    const res = await fetch(path);
+
+    if (!res.ok) {
+      console.warn('Failed to fetch:', path);
+      return;
+    }
+
+    const data = await res.json();
+
+    if (!data.features || !Array.isArray(data.features)) {
+      console.warn('Invalid GeoJSON:', path);
+      return;
+    }
+
+    const color = STRESS_COLORS[colorKey];
+    const height = classHeights[heightKey];
+
+    let loadedCount = 0;
+    let skippedCount = 0;
+
+    data.features.forEach((feature, index) => {
+      try {
+
+        if (!feature.geometry) {
+          skippedCount++;
+          return;
+        }
+
+        if (feature.geometry.type !== 'Polygon') {
+          skippedCount++;
+          return;
+        }
+
+        if (!feature.geometry.coordinates) {
+          skippedCount++;
+          return;
+        }
+
+        const coords = feature.geometry.coordinates[0];
+
+        if (!coords || coords.length < 4) {
+          skippedCount++;
+          return;
+        }
+
+        // Prevent massive polygons from breaking Cesium
+        if (coords.length > 1000) {
+          console.warn('Skipping huge polygon:', index);
+          skippedCount++;
+          return;
+        }
+
+        // Validate coordinates
+        const validCoords = coords.filter(c => {
+          return (
+            Array.isArray(c) &&
+            c.length >= 2 &&
+            Number.isFinite(c[0]) &&
+            Number.isFinite(c[1]) &&
+            c[0] >= -180 &&
+            c[0] <= 180 &&
+            c[1] >= -90 &&
+            c[1] <= 90
+          );
+        });
+
+        if (validCoords.length < 4) {
+          skippedCount++;
+          return;
+        }
+
+        const positions = validCoords.map(c =>
+          Cesium.Cartesian3.fromDegrees(c[0], c[1])
+        );
+
+        viewer.entities.add({
+          name: heightKey + ' Tree',
+
+          description:
+            '<table style="font-family:monospace;font-size:12px;color:#333">' +
+            '<tr><td>Class</td><td>' + heightKey + '</td></tr>' +
+            '<tr><td>Vertices</td><td>' + validCoords.length + '</td></tr>' +
+            '</table>',
+
+          polygon: {
+            hierarchy: new Cesium.PolygonHierarchy(positions),
+
+            material: color,
+
+            perPositionHeight: false,
+
+            height: 0,
+
+            // extrusion temporarily disabled for debugging
+            extrudedHeight: undefined,
+
+            outline: false,
+            
+
+            closeTop: true,
+            closeBottom: false
+          }
+        });
+
+        loadedCount++;
+
+      } catch (err) {
+        skippedCount++;
+        console.warn('Bad polygon skipped:', err);
+      }
+    });
+
+    console.log(`${path}`);
+    console.log(`Loaded: ${loadedCount}`);
+    console.log(`Skipped: ${skippedCount}`);
+
+  } catch (e) {
+    console.warn('Could not load', path, e);
+  }
+}
+
+// ── Load field points as 3D markers ──────────────────
+async function loadFieldPoints(path) {
+  try {
+    const res = await fetch(path);
+    const data = await res.json();
+
+    data.features.forEach(feature => {
+      if (!feature.geometry) return;
+      const [lon, lat] = feature.geometry.coordinates;
+      const p = feature.properties;
+      viewer.entities.add({
+        name: 'Field Point ' + (p.Point_ID || ''),
+        description: '<table style="font-family:monospace;font-size:12px;color:#333">' +
+          '<tr><td>Point ID</td><td>' + (p.Point_ID || 'N/A') + '</td></tr>' +
+          '<tr><td>Class</td><td>' + (p.MAJORITY || 'N/A') + '</td></tr>' +
+          '</table>',
+        position: Cesium.Cartesian3.fromDegrees(lon, lat, 25),
+        cylinder: {
+          length: 25,
+          topRadius: 0,
+          bottomRadius: 1.5,
+          material: Cesium.Color.fromCssColorString('#8e44ad').withAlpha(0.9),
+          outline: false
+        }
+      });
+    });
+  } catch(e) {
+    console.warn('Could not load field points', e);
+  }
+}
+
+// ── Load all layers ───────────────────────────────────
+async function loadAllLayers() {
+  await Promise.all([
+    // Area 1
+    loadTreePolygons('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Green.json',  'green',  'Green'),
+    loadTreePolygons('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Yellow.json', 'yellow', 'Yellow'),
+    loadTreePolygons('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Orange.json', 'orange', 'Orange'),
+    loadTreePolygons('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Red.json',    'red',    'Red'),
+    loadTreePolygons('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Cyan_NoLeaf.json', 'teal', 'NoLeaf'),
+    // Area 2
+    loadTreePolygons('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Green.json',  'green',  'Green'),
+    loadTreePolygons('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Yellow.json', 'yellow', 'Yellow'),
+    loadTreePolygons('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Orange.json', 'orange', 'Orange'),
+    loadTreePolygons('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Red.json',    'red',    'Red'),
+    loadTreePolygons('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Cyan_NoLeaf.json', 'teal', 'NoLeaf'),
+    // Field points
+    loadFieldPoints('data/GeoJson/Area2/Points_Area2_All.json')
+  ]);
+}
+
+// ── Startup sequence ──────────────────────────────────
+// 1. Fly to overview
+// 2. Load layers
+// 3. Hide loading screen
+
+loadAllLayers().then(() => {
+  setTimeout(() => {
+    document.getElementById('loading').classList.add('hidden');
+  }, 2200);
+});
+
+</script>
+</body>
+</html>

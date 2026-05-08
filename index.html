@@ -1,289 +1,1106 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Tree Health Dashboard MVP</title>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <style>
-        body { margin:0; padding:0; font-family:Arial, sans-serif; }
-        #map { position:absolute; top:0; bottom:0; width:100%; }
+  <title>Hutchinson Acres — Tree Health Dashboard</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-        .legend {
-            background: white;
-            padding: 10px;
-            border-radius: 4px;
-            line-height: 20px;
-        }
-        .legend i {
-            width: 18px;
-            height: 18px;
-            float: left;
-            margin-right: 8px;
-            opacity: 0.8;
-        }
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-        .stats-panel {
-            position: absolute;
-            top: 80px;
-            left: 10px;
-            background: white;
-            padding: 12px;
-            border-radius: 4px;
-            z-index: 1000;
-            min-width: 180px;
-            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
-            pointer-events: auto;
-        }
-        .stats-panel h4 { margin: 0 0 8px 0; }
-        .stats-panel p { margin: 4px 0; font-size:13px; }
+  <!-- Scripts must load in this exact order, no async/defer -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/georaster@1.6.0/dist/georaster.browser.bundle.min.js"></script>
+  <script src="https://unpkg.com/georaster-layer-for-leaflet@3.10.0/dist/georaster-layer-for-leaflet.min.js"></script>
 
-        .disclaimer {
-            position: absolute;
-            bottom: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255,255,255,0.9);
-            padding: 8px 12px;
-            border-radius: 4px;
-            z-index: 1000;
-            font-size: 12px;
-            max-width: 600px;
-            text-align: center;
-        }
-    </style>
+  <style>
+    /* ── Reset & base ─────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      height: 100%;
+      font-family: 'Georgia', serif;
+      background: #1a1f1a;
+      color: #e8ede8;
+    }
+
+    /* ── Layout ───────────────────────────────────────── */
+    #app {
+      display: flex;
+      height: 100%;
+      width: 100%;
+    }
+
+    /* ── Sidebar ──────────────────────────────────────── */
+    #sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: #1a1f1a;
+      border-right: 1px solid #2e3a2e;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      z-index: 2000;
+    }
+
+    #sidebar-header {
+      padding: 18px 16px 14px;
+      border-bottom: 1px solid #2e3a2e;
+    }
+
+    #sidebar-header h1 {
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #7ab87a;
+      font-weight: normal;
+      margin-bottom: 4px;
+    }
+
+    #sidebar-header h2 {
+      font-size: 18px;
+      font-weight: normal;
+      color: #e8ede8;
+      line-height: 1.3;
+    }
+
+    #sidebar-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0;
+    }
+
+    #sidebar-body::-webkit-scrollbar { width: 4px; }
+    #sidebar-body::-webkit-scrollbar-track { background: transparent; }
+    #sidebar-body::-webkit-scrollbar-thumb { background: #2e3a2e; border-radius: 2px; }
+
+    /* ── Sidebar sections ─────────────────────────────── */
+    .sidebar-section {
+      border-bottom: 1px solid #2e3a2e;
+      padding: 14px 16px;
+    }
+
+    .sidebar-section-title {
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: #5a7a5a;
+      margin-bottom: 10px;
+    }
+
+    /* ── Basemap tabs (floating top-right of map) ─────── */
+    .basemap-tabs-float {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      gap: 4px;
+      background: rgba(26,31,26,0.92);
+      border: 1px solid #2e3a2e;
+      border-radius: 6px;
+      padding: 5px;
+    }
+
+    .basemap-tab {
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: 4px;
+      padding: 5px 10px;
+      text-align: center;
+      font-size: 11px;
+      color: #5a7a5a;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.15s;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+
+    .basemap-tab:hover {
+      border-color: #4a8a4a;
+      color: #a8d4a8;
+    }
+
+    .basemap-tab.active {
+      background: #2a3a2a;
+      border-color: #7ab87a;
+      color: #7ab87a;
+    }
+
+    /* ── Stats grid ───────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .stat-box {
+      background: #222922;
+      border: 1px solid #2e3a2e;
+      border-radius: 4px;
+      padding: 8px 6px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 18px;
+      color: #7ab87a;
+      display: block;
+      line-height: 1;
+      margin-bottom: 3px;
+    }
+
+    .stat-label {
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #5a7a5a;
+    }
+
+    /* ── Layer toggle rows ────────────────────────────── */
+    .layer-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .layer-row:hover .layer-label { color: #a8d4a8; }
+
+    .layer-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 2px;
+      flex-shrink: 0;
+      border: 1px solid rgba(255,255,255,0.15);
+    }
+
+    .layer-label {
+      font-size: 12px;
+      color: #b0c8b0;
+      transition: color 0.15s;
+      flex: 1;
+    }
+
+    .layer-toggle {
+      width: 28px;
+      height: 15px;
+      background: #2e3a2e;
+      border-radius: 8px;
+      position: relative;
+      flex-shrink: 0;
+      transition: background 0.2s;
+    }
+
+    .layer-toggle.on { background: #4a8a4a; }
+
+    .layer-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #7ab87a;
+      transition: transform 0.2s;
+    }
+
+    .layer-toggle.on::after { transform: translateX(13px); }
+
+    /* ── Raster opacity slider ────────────────────────── */
+    .opacity-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0 2px;
+    }
+
+    .opacity-label {
+      font-size: 10px;
+      color: #5a7a5a;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      width: 52px;
+      flex-shrink: 0;
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 3px;
+      background: #2e3a2e;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #7ab87a;
+      cursor: pointer;
+    }
+
+    .opacity-value {
+      font-size: 10px;
+      color: #5a7a5a;
+      width: 28px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Loading indicator ────────────────────────────── */
+    .loading-badge {
+      display: inline-block;
+      font-size: 10px;
+      background: #2a3a2a;
+      color: #7ab87a;
+      border-radius: 10px;
+      padding: 2px 8px;
+      margin-left: 6px;
+      letter-spacing: 0.05em;
+    }
+
+    /* ── Map ──────────────────────────────────────────── */
+    #map {
+      flex: 1;
+      height: 100%;
+      position: relative;
+      min-width: 0;
+    }
+
+    /* Base layer switcher — keep Leaflet's built-in control visible */
+    .leaflet-control-layers {
+      background: rgba(26,31,26,0.92) !important;
+      border: 1px solid #2e3a2e !important;
+      color: #b0c8b0 !important;
+      border-radius: 4px !important;
+      font-size: 12px !important;
+    }
+    .leaflet-control-layers label { color: #b0c8b0 !important; }
+    .leaflet-control-layers-toggle { background-color: #1a1f1a !important; }
+
+    /* ── Legend (bottom-left of map) ──────────────────── */
+    .map-legend {
+      background: rgba(26,31,26,0.92);
+      border: 1px solid #2e3a2e;
+      border-radius: 4px;
+      padding: 10px 12px;
+      color: #b0c8b0;
+      font-size: 11px;
+      line-height: 1.6;
+      min-width: 130px;
+    }
+
+    .map-legend strong {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #5a7a5a;
+      margin-bottom: 6px;
+      font-weight: normal;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 2px;
+    }
+
+    .legend-swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* ── Disclaimer ───────────────────────────────────── */
+    .map-disclaimer {
+      background: rgba(26,31,26,0.88);
+      border: 1px solid #2e3a2e;
+      border-radius: 4px;
+      padding: 6px 12px;
+      color: #5a7a5a;
+      font-size: 11px;
+      max-width: 500px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    /* ── Validation panel ─────────────────────────────── */
+    .validation-note {
+      font-size: 11px;
+      color: #5a7a5a;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      font-style: italic;
+    }
+
+    .val-subtitle {
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #7ab87a;
+      margin-bottom: 6px;
+    }
+
+    .val-bar-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 5px;
+    }
+
+    .val-bar-label {
+      font-size: 10px;
+      color: #b0c8b0;
+      width: 58px;
+      flex-shrink: 0;
+    }
+
+    .val-bar-track {
+      flex: 1;
+      height: 10px;
+      background: #222922;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .val-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s ease;
+    }
+
+    .val-bar-pct {
+      font-size: 10px;
+      color: #5a7a5a;
+      width: 34px;
+      text-align: right;
+      flex-shrink: 0;
+    }
+
+    /* ── Raster loading spinner ───────────────────────── */
+    #raster-status {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(26,31,26,0.92);
+      border: 1px solid #4a8a4a;
+      border-radius: 4px;
+      padding: 5px 14px;
+      font-size: 11px;
+      color: #7ab87a;
+      z-index: 1500;
+      display: none;
+      letter-spacing: 0.05em;
+    }
+  </style>
 </head>
 <body>
+<div id="app">
 
-<div id="map"></div>
+  <!-- ── Sidebar ──────────────────────────────────────── -->
+  <div id="sidebar">
+    <div id="sidebar-header">
+      <h1>Hutchinson Acres</h1>
+      <h2>Tree Health<br>Dashboard</h2>
+    </div>
 
-<div class="stats-panel">
-    <h4>Dashboard Stats</h4>
-    <p id="trees">Trees: Loading...</p>
-    <p id="points">Field Points: Loading...</p>
-    <p id="contours">Contours: Loading...</p>
-</div>
+    <div id="sidebar-body">
 
-<div class="disclaimer">
-    This dashboard supports exploratory analysis. The data may not show strong or conclusive relationships between canopy health and sap production.
-</div>
+      <!-- Stats -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Summary</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-value" id="stat-trees">—</span>
+            <span class="stat-label">Trees</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-points">—</span>
+            <span class="stat-label">Field Pts</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value" id="stat-contours">—</span>
+            <span class="stat-label">Contours</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Raster opacity -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Raster Opacity</div>
+        <div class="opacity-row">
+          <span class="opacity-label">All</span>
+          <input type="range" id="raster-opacity" min="0" max="100" value="70">
+          <span class="opacity-value" id="raster-opacity-val">70%</span>
+        </div>
+      </div>
+
+      <!-- Area 1 rasters -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Area 1 — Rasters</div>
+        <div id="raster-toggles-area1"></div>
+      </div>
+
+      <!-- Area 2 rasters -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Area 2 — Rasters</div>
+        <div id="raster-toggles-area2"></div>
+      </div>
+
+      <!-- Vector layers -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Leaf Classification</div>
+        <div id="vector-toggles"></div>
+      </div>
+
+      <!-- Terrain / other vectors -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Terrain &amp; Field Data</div>
+        <div id="terrain-toggles"></div>
+      </div>
+
+      <!-- Validation panel -->
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Validation — Area 2</div>
+        <div class="validation-note">
+          Comparing all Area 2 trees against flagged low-sap trees.
+          A weak but statistically significant difference was found (p = 0.03).
+          Results should be interpreted with caution.
+        </div>
+
+        <div class="val-subtitle">All Area 2 Trees (3,838)</div>
+        <div id="val-all-bars"></div>
+
+        <div class="val-subtitle" style="margin-top:12px">Flagged Low-Sap Trees (161)</div>
+        <div id="val-flagged-bars"></div>
+
+        <div class="validation-note" style="margin-top:10px">
+          No significant correlation was found between canopy colour and sap production
+          across lidar, NDVI, slope, aspect, or terrain layers. Below-ground factors
+          (soil, roots, moisture) are likely more important.
+        </div>
+      </div>
+
+    </div><!-- /sidebar-body -->
+  </div><!-- /sidebar -->
+
+  <!-- ── Map ──────────────────────────────────────────── -->
+  <div id="map">
+    <div id="raster-status">Loading raster…</div>
+    <div id="basemap-tabs" class="basemap-tabs-float"></div>
+  </div>
+
+</div><!-- /app -->
 
 <script>
 /*
 ==========================================================
- PSEUDOCODE / HOW THIS DASHBOARD WORKS (plain language)
+  HOW THIS DASHBOARD WORKS
 ==========================================================
 
-1. LOAD MAP
-   - Create a Leaflet map centred on the study area.
-   - Add an OpenStreetMap base layer for geographic context.
+  VECTORS (GeoJSON):
+    Loaded with Leaflet's built-in fetch + geoJSON().
+    Tree crown polygons, field points, contour lines.
 
-2. LOAD LAYERS
-   - For each GeoJSON file (tree polygons, field points, contour lines):
-     a. Fetch the file from the data/ folder.
-     b. Parse the GeoJSON features.
-     c. Add them to the map as a styled layer.
-     d. Register the layer in the layer-control panel so the
-        user can toggle it on/off.
+  RASTERS (COG GeoTIFF):
+    Loaded with the georaster library (parses the .tif)
+    and rendered with georaster-layer-for-leaflet.
+    The browser fetches the file directly — no tile server
+    needed — because the files are Cloud-Optimised GeoTIFFs
+    stored in Web Mercator (EPSG:3857).
 
-3. STYLE LAYERS
-   - Tree polygons are coloured by their stress category
-     (Green = healthy … Red = high stress).
-   - Field/sap points are coloured by their MAJORITY class code
-     using the same colour palette, with a larger radius so they
-     are easy to see.
-   - Contour lines are thin grey lines with no fill.
+    Each raster gets a pixelValuesToColorFn that maps the
+    raw pixel value to an RGBA colour:
+      • NDVI:      −1→red  …  0→yellow  …  +1→green
+      • Hillshade: 0→black  …  255→white (greyscale)
+      • Slope:     0→pale  …  90→dark brown
+      • Aspect:    mapped to a compass-direction hue wheel
+      • Stream:    non-zero pixels shown as blue
 
-4. SHOW POPUPS
-   - When a user clicks a tree polygon or field point, a popup
-     appears showing human-readable labels:
-       • Tree Condition or Tree Classification (e.g. "Healthy (Green)")
-       • The raw class code for reference
-       • Area, confidence, or other relevant fields.
+    Pixels with nodata values are returned as transparent.
 
-5. SHOW STATS
-   - A small panel in the top-left shows live counts of how many
-     tree polygons, field points, and contour features are loaded.
+  LAYER CONTROL:
+    Custom sidebar toggles — no Leaflet layer control widget.
+    A global raster-opacity slider adjusts all raster layers.
 ==========================================================
 */
 
-// ── 1. Initialize map ──────────────────────────────────
-const map = L.map('map').setView([45.1, -64.5], 16);
+// ── Map init ─────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([45.1, -64.5], 16);
 
-// Base layer – CartoDB Voyager (OpenStreetMap-based, no access restrictions)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20,
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
-    subdomains: 'abcd'
-}).addTo(map);
+// ── Base layers ───────────────────────────────────────
+const baseLayers = {
+  'Dark': L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, subdomains: 'abcd',
+    attribution: '© OpenStreetMap contributors © CARTO'
+  }),
+  'Street': L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, subdomains: 'abcd',
+    attribution: '© OpenStreetMap contributors © CARTO'
+  }),
+  'Satellite': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19,
+    attribution: '© Esri, Maxar, Earthstar Geographics'
+  }),
+  'Topo': L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+    maxZoom: 17,
+    attribution: '© OpenStreetMap contributors © OpenTopoMap'
+  })
+};
 
-// Layer control (overlays only, collapsed so it doesn't crowd the map)
-const layerControl = L.control.layers({}, {}, {collapsed: false}).addTo(map);
+// Start on Dark
+let activeBase = 'Dark';
+baseLayers['Dark'].addTo(map);
 
-// ── Stats counters ─────────────────────────────────────
-let treeCount = 0;
-let pointCount = 0;
-let contourCount = 0;
+// Build basemap tabs
+const basemapTabsContainer = document.getElementById('basemap-tabs');
+Object.keys(baseLayers).forEach(name => {
+  const tab = document.createElement('div');
+  tab.className = 'basemap-tab' + (name === 'Dark' ? ' active' : '');
+  tab.id = 'base-tab-' + name;
+  tab.textContent = name;
+  basemapTabsContainer.appendChild(tab);
 
-// ── 2. Colour & label mappings ─────────────────────────
+  tab.addEventListener('click', () => {
+    if (activeBase === name) return;
+    map.removeLayer(baseLayers[activeBase]);
+    document.getElementById('base-tab-' + activeBase).classList.remove('active');
+    baseLayers[name].addTo(map);
+    baseLayers[name].bringToBack();
+    document.getElementById('base-tab-' + name).classList.add('active');
+    activeBase = name;
+  });
+});
 
-// Stress-category display colours
+// ── Colour palettes ───────────────────────────────────
 const stressColors = {
-    'Green':  '#2ecc71',
-    'Yellow': '#f1c40f',
-    'Orange': '#e67e22',
-    'Red':    '#e74c3c',
-    'NoLeaf': '#3498db'
+  'Green':  '#2ecc71',
+  'Yellow': '#f1c40f',
+  'Orange': '#e67e22',
+  'Red':    '#e74c3c',
+  'NoLeaf': '#3498db'
 };
 
-// MAJORITY class-code → human-readable label + colour key
 const classLabels = {
-    1: { label: 'High Stress',     colour: 'Red'    },
-    2: { label: 'Moderate Stress',  colour: 'Orange' },
-    3: { label: 'Mild Stress',      colour: 'Yellow' },
-    5: { label: 'Leafless',         colour: 'NoLeaf' },
-    6: { label: 'Healthy',          colour: 'Green'  }
+  1: { label: 'High Stress',      colour: 'Red'    },
+  2: { label: 'Moderate Stress',  colour: 'Orange' },
+  3: { label: 'Mild Stress',      colour: 'Yellow' },
+  5: { label: 'Leafless',         colour: 'NoLeaf' },
+  6: { label: 'Healthy',          colour: 'Green'  }
 };
 
-/** Return a friendly string like "Healthy (Green)" for a MAJORITY code. */
 function classDescription(code) {
-    const info = classLabels[code];
-    if (!info) return 'Unknown (' + code + ')';
-    return info.label + ' (' + info.colour + ')';
+  const info = classLabels[code];
+  return info ? info.label + ' (' + info.colour + ')' : 'Unknown (' + code + ')';
 }
 
-/** Return a fill colour for a MAJORITY code. */
 function classColor(code) {
-    const info = classLabels[code];
-    if (!info) return '#999';
-    return stressColors[info.colour] || '#999';
+  const info = classLabels[code];
+  return info ? (stressColors[info.colour] || '#999') : '#999';
 }
 
-// ── 3. Legend ───────────────────────────────────────────
-const legend = L.control({position: 'bottomleft'});
-legend.onAdd = function () {
-    const div = L.DomUtil.create('div', 'legend');
-    div.innerHTML += '<b>Leaf Stress</b><br>';
-    for (const [label, color] of Object.entries(stressColors)) {
-        div.innerHTML += '<i style="background:' + color + '"></i> ' + label + '<br>';
+// ── NDVI colour ramp ──────────────────────────────────
+// Maps NDVI float (typically −1 to +1) to RGB.
+// Below −0.1 → transparent (non-vegetation / nodata)
+// −0.1→0   → red  (very low / stressed)
+//  0  →0.4 → yellow to light green
+//  0.4→1.0 → green (healthy dense canopy)
+function ndviColor(v) {
+  if (v === null || v === undefined || isNaN(v) || v < -0.1) return null;
+  let r, g, b;
+  if (v < 0) {
+    // red zone
+    r = 220; g = 50; b = 50;
+  } else if (v < 0.2) {
+    const t = v / 0.2;
+    r = Math.round(220 - t * 170); // 220→50
+    g = Math.round(50  + t * 150); // 50→200
+    b = 50;
+  } else if (v < 0.5) {
+    const t = (v - 0.2) / 0.3;
+    r = Math.round(50  - t * 20);  // 50→30
+    g = Math.round(200 + t * 55);  // 200→255
+    b = Math.round(50  - t * 30);  // 50→20
+  } else {
+    r = 20; g = 200; b = 20;
+  }
+  return [r, g, b, 200];
+}
+
+// ── Hillshade colour ramp ─────────────────────────────
+// 0–255 greyscale, transparent at nodata (0 or very low)
+function hillshadeColor(v) {
+  if (v === null || v === undefined || isNaN(v) || v <= 0) return null;
+  const c = Math.round(v);
+  return [c, c, c, 180];
+}
+
+// ── Slope colour ramp ─────────────────────────────────
+// 0°=tan/pale → 45°+=dark brown
+function slopeColor(v) {
+  if (v === null || v === undefined || isNaN(v) || v < 0) return null;
+  const t = Math.min(v / 45, 1);
+  const r = Math.round(210 - t * 130);
+  const g = Math.round(180 - t * 120);
+  const b = Math.round(140 - t * 100);
+  return [r, g, b, 180];
+}
+
+// ── Aspect colour ramp ────────────────────────────────
+// Hue wheel: N=blue, E=yellow, S=red, W=green
+function aspectColor(v) {
+  if (v === null || v === undefined || isNaN(v) || v < 0) return null;
+  const hue = v; // 0–360
+  const h = hue / 60;
+  const i = Math.floor(h);
+  const f = h - i;
+  const q = 1 - f;
+  let r, g, b;
+  switch (i % 6) {
+    case 0: r=255; g=Math.round(f*255); b=0;   break;
+    case 1: r=Math.round(q*255); g=255; b=0;   break;
+    case 2: r=0; g=255; b=Math.round(f*255);   break;
+    case 3: r=0; g=Math.round(q*255); b=255;   break;
+    case 4: r=Math.round(f*255); g=0; b=255;   break;
+    case 5: r=255; g=0; b=Math.round(q*255);   break;
+    default: r=128; g=128; b=128;
+  }
+  return [r, g, b, 160];
+}
+
+// ── Stream colour ─────────────────────────────────────
+// Non-zero pixels = blue stream line
+function streamColor(v) {
+  if (v === null || v === undefined || isNaN(v) || v === 0) return null;
+  return [52, 152, 219, 220];
+}
+
+// ── RGB ortho ─────────────────────────────────────────
+// 3-band raster rendered as true colour
+function rgbColor(values) {
+  if (!values || values.length < 3) return null;
+  const [r, g, b] = values;
+  if (r === 0 && g === 0 && b === 0) return null; // nodata
+  return [r, g, b, 220];
+}
+
+
+// ── Local XYZ Tile Loader ─────────────────────────────
+
+const rasterLayers = {};
+let globalOpacity = 0.70;
+
+function loadXYZTiles(config) {
+
+  const container = document.getElementById(config.container);
+
+  const row = document.createElement('div');
+
+  row.className = 'layer-row';
+
+  row.innerHTML =
+    '<div class="layer-swatch" style="background:' + config.swatch + '"></div>' +
+    '<span class="layer-label">' + config.label + '</span>' +
+    '<div class="layer-toggle' + (config.defaultOn ? ' on' : '') + '" id="toggle-' + config.id + '"></div>';
+
+  container.appendChild(row);
+
+  const layer = L.tileLayer(
+    config.path + '/{z}/{x}/{y}.png',
+    {
+      minZoom: config.minZoom || 16,
+      maxZoom: config.maxZoom || 22,
+      opacity: globalOpacity,
+      attribution: 'AGRG NSCC'
     }
-    return div;
-};
-legend.addTo(map);
+  );
 
-// ── 4. Popup builders ──────────────────────────────────
+  rasterLayers[config.id] = layer;
 
+  if (config.defaultOn) {
+    layer.addTo(map);
+  }
+
+  const toggle = document.getElementById('toggle-' + config.id);
+
+  row.addEventListener('click', () => {
+
+    const isOn = toggle.classList.contains('on');
+
+    if (isOn) {
+      map.removeLayer(layer);
+      toggle.classList.remove('on');
+    } else {
+      layer.addTo(map);
+      toggle.classList.add('on');
+    }
+  });
+}
+
+// ── Global opacity slider ─────────────────────────────
+document.getElementById('raster-opacity').addEventListener('input', function() {
+  globalOpacity = this.value / 100;
+  document.getElementById('raster-opacity-val').textContent = this.value + '%';
+  Object.values(rasterLayers).forEach(layer => {
+    if (layer.setOpacity) layer.setOpacity(globalOpacity);
+  });
+});
+
+// ── Stats counters ────────────────────────────────────
+let treeCount = 0, pointCount = 0, contourCount = 0;
+
+function updateStats() {
+  document.getElementById('stat-trees').textContent    = treeCount.toLocaleString();
+  document.getElementById('stat-points').textContent   = pointCount.toLocaleString();
+  document.getElementById('stat-contours').textContent = contourCount.toLocaleString();
+}
+
+// ── Popup builders ────────────────────────────────────
 function treePopup(feature) {
-    const p = feature.properties;
-    const code = p.MAJORITY;
-    return '<b>Tree Polygon</b><br>' +
-        'Tree Condition: ' + classDescription(code) + '<br>' +
-        'Class Code: ' + (code != null ? code : 'N/A') + '<br>' +
-        'Confidence: ' + (p.Confidence != null ? p.Confidence.toFixed(1) + '%' : 'N/A') + '<br>' +
-        'Area: ' + (p.Shape_Area != null ? p.Shape_Area.toFixed(2) + ' m²' : 'N/A') + '<br>' +
-        'Perimeter: ' + (p.Shape_Leng != null ? p.Shape_Leng.toFixed(2) + ' m' : 'N/A');
+  const p = feature.properties;
+  const code = p.MAJORITY;
+  return '<b>Tree Polygon</b><br>' +
+    'Tree Condition: ' + classDescription(code) + '<br>' +
+    'Class Code: ' + (code != null ? code : 'N/A') + '<br>' +
+    'Confidence: ' + (p.Confidence != null ? p.Confidence.toFixed(1) + '%' : 'N/A') + '<br>' +
+    'Area: ' + (p.Shape_Area != null ? p.Shape_Area.toFixed(2) + ' m²' : 'N/A') + '<br>' +
+    'Perimeter: ' + (p.Shape_Leng != null ? p.Shape_Leng.toFixed(2) + ' m' : 'N/A');
 }
 
 function pointPopup(feature) {
-    const p = feature.properties;
-    const code = p.MAJORITY;
-    return '<b>Field Point: ' + (p.Point_ID || 'N/A') + '</b><br>' +
-        'Tree Classification: ' + classDescription(code) + '<br>' +
-        'Class Code: ' + (code != null ? code : 'N/A') + '<br>' +
-        'Ortho Height: ' + (p.Ortho != null ? p.Ortho.toFixed(1) + ' m' : 'N/A') + '<br>' +
-        'X: ' + (p.X != null ? p.X.toFixed(1) : 'N/A') + '<br>' +
-        'Y: ' + (p.Y != null ? p.Y.toFixed(1) : 'N/A');
+  const p = feature.properties;
+  const code = p.MAJORITY;
+  return '<b>Field Point: ' + (p.Point_ID || 'N/A') + '</b><br>' +
+    'Tree Classification: ' + classDescription(code) + '<br>' +
+    'Class Code: ' + (code != null ? code : 'N/A') + '<br>' +
+    'Ortho Height: ' + (p.Ortho != null ? p.Ortho.toFixed(1) + ' m' : 'N/A') + '<br>' +
+    'X: ' + (p.X != null ? p.X.toFixed(1) : 'N/A') + '<br>' +
+    'Y: ' + (p.Y != null ? p.Y.toFixed(1) : 'N/A');
 }
 
 function contourPopup(feature) {
-    return '<b>Contour Line</b><br>Elevation: ' + feature.properties.Contour + ' m';
+  return '<b>Contour Line</b><br>Elevation: ' + feature.properties.Contour + ' m';
 }
 
-// ── 5. GeoJSON loader ──────────────────────────────────
+// ── GeoJSON loader ────────────────────────────────────
+async function loadGeoJSON(path, label, style, popupFn, container, swatch, defaultOn = true) {
+  // Build sidebar toggle row
+  const parent = document.getElementById(container);
+  const row = document.createElement('div');
+  row.className = 'layer-row';
+  row.innerHTML =
+    '<div class="layer-swatch" style="background:' + swatch + '"></div>' +
+    '<span class="layer-label">' + label + '</span>' +
+    '<div class="layer-toggle' + (defaultOn ? ' on' : '') + '" id="toggle-vec-' + label.replace(/\s+/g,'') + '"></div>';
+  parent.appendChild(row);
 
-async function loadGeoJSON(path, name, style, popupFn) {
-    try {
-        const res = await fetch(path);
-        const data = await res.json();
+  try {
+    const res = await fetch(path);
+    const data = await res.json();
+    const isPoint = label.includes('Point');
 
-        const isPointLayer = name.includes('Point');
+    const layer = L.geoJSON(data, {
+      style: f => Object.assign({}, style, { interactive: true }),
+      pointToLayer: (feature, latlng) => L.circleMarker(latlng, {
+        radius: 8,
+        fillColor: classColor(feature.properties.MAJORITY),
+        color: '#000',
+        weight: 2,
+        fillOpacity: 0.9,
+        interactive: true
+      }),
+      onEachFeature: (feature, lyr) => lyr.bindPopup(popupFn(feature))
+    });
 
-        const layer = L.geoJSON(data, {
-            // Polygon / line style – ensure interactive so clicks work
-            style: function (feature) {
-                return Object.assign({}, style, { interactive: true });
-            },
-            // Point rendering – colour by MAJORITY, larger radius
-            pointToLayer: function (feature, latlng) {
-                const maj = feature.properties.MAJORITY;
-                return L.circleMarker(latlng, {
-                    radius: 8,
-                    fillColor: classColor(maj),
-                    color: '#000',
-                    weight: 2,
-                    fillOpacity: 0.9,
-                    interactive: true
-                });
-            },
-            onEachFeature: function (feature, layer) {
-                layer.bindPopup(popupFn(feature));
-            }
-        });
+    if (defaultOn) layer.addTo(map);
 
-        layerControl.addOverlay(layer, name);
-        layer.addTo(map);
+    const n = data.features.length;
+    if (label.toLowerCase().includes('point')) { pointCount += n; }
+    else if (label.toLowerCase().includes('contour')) { contourCount += n; }
+    else { treeCount += n; }
+    updateStats();
 
-        // Update counts
-        const n = data.features.length;
-        if (name.includes('Tree') || name.includes('Healthy') || name.includes('Stress') || name.includes('Leafless')) {
-            treeCount += n;
-        }
-        if (name.includes('Point'))   pointCount   += n;
-        if (name.includes('Contour')) contourCount  += n;
-
-        updateStats();
-
-        // Fit map bounds on first meaningful load
-        if (treeCount + pointCount + contourCount === n) {
-            map.fitBounds(layer.getBounds());
-        }
-
-    } catch (e) {
-        console.log('Failed to load ' + name + ':', e);
+    // Fit map on first load
+    if (treeCount + pointCount + contourCount === n) {
+      map.fitBounds(layer.getBounds());
     }
+
+    // Wire toggle
+    const toggleId = 'toggle-vec-' + label.replace(/\s+/g,'');
+    const toggle = document.getElementById(toggleId);
+    row.addEventListener('click', () => {
+      const isOn = toggle.classList.contains('on');
+      if (isOn) { map.removeLayer(layer); toggle.classList.remove('on'); }
+      else { layer.addTo(map); toggle.classList.add('on'); }
+    });
+
+  } catch (e) {
+    console.warn('Failed to load vector:', path, e);
+  }
 }
 
-function updateStats() {
-    document.getElementById('trees').textContent    = 'Trees: '        + treeCount;
-    document.getElementById('points').textContent   = 'Field Points: ' + pointCount;
-    document.getElementById('contours').textContent = 'Contours: '     + contourCount;
+// ── Legend ────────────────────────────────────────────
+const legend = L.control({ position: 'bottomleft' });
+legend.onAdd = () => {
+  const div = document.createElement('div');
+  div.className = 'map-legend';
+  div.innerHTML = '<strong>Leaf Stress</strong>' +
+    Object.entries(stressColors).map(([label, color]) =>
+      '<div class="legend-row"><div class="legend-swatch" style="background:' + color + '"></div>' + label + '</div>'
+    ).join('');
+  return div;
+};
+legend.addTo(map);
+
+// ── Disclaimer ────────────────────────────────────────
+const disclaimer = L.control({ position: 'bottomright' });
+disclaimer.onAdd = () => {
+  const div = document.createElement('div');
+  div.className = 'map-disclaimer';
+  div.textContent = 'Exploratory analysis only. No strong correlations were found between canopy remote sensing and sap production. See report for details.';
+  return div;
+};
+disclaimer.addTo(map);
+
+// ══════════════════════════════════════════════════════
+//   LOAD COG RASTERS
+//   defaultOn: true  = layer visible on startup
+//   defaultOn: false = layer available but toggled off
+// ══════════════════════════════════════════════════════
+
+// ── Area 1 rasters ────────────────────────────────────
+loadXYZTiles({
+  id: 'a1-ndvi',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_APT_Area1_NDVI_FORCED_Cog',
+  label: 'NDVI',
+  container: 'raster-toggles-area1',
+  defaultOn: true,
+  swatch: 'linear-gradient(to right, #e74c3c, #f1c40f, #2ecc71)'
+});
+
+loadXYZTiles({
+  id: 'a1-hillshade',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Section1_DEM_50cm_Class2-3_Hillshade_Clipped_FORCED_Cog',
+  label: 'Hillshade (DEM)',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#888'
+});
+
+loadXYZTiles({
+  id: 'a1-hillshade-contour',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutch_Section1_Hillshade_ForContours_clipped_FORCED_Cog',
+  label: 'Hillshade (Surface)',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#aaa'
+});
+
+loadXYZTiles({
+  id: 'a1-slope',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutch_Section1_Slope_clipped_FORCED_Cog',
+  label: 'Slope',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#c8a870'
+});
+
+loadXYZTiles({
+  id: 'a1-aspect',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/Hutch_Section1_Aspect_clipped_FORCED_Cog',
+  label: 'Aspect',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: 'linear-gradient(to right, #3498db, #f1c40f, #e74c3c, #2ecc71)'
+});
+
+loadXYZTiles({
+  id: 'a1-stream',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/Stream_Area1_clipped_Cog',
+  label: 'Stream',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#3498db'
+});
+
+loadXYZTiles({
+  id: 'a1-rgb-p1',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_NoHoleFilling_Fill_RC_Ortho_Cog_part1',
+  label: 'RGB Ortho (part 1)',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#5d8a5d'
+});
+
+loadXYZTiles({
+  id: 'a1-rgb-p2',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_NoHoleFilling_Fill_RC_Ortho_Cog_part2',
+  label: 'RGB Ortho (part 2)',
+  container: 'raster-toggles-area1',
+  defaultOn: false,
+  swatch: '#6a9a6a'
+});
+
+// ── Area 2 rasters ────────────────────────────────────
+loadXYZTiles({
+  id: 'a2-ndvi',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutchinson_APT_Area2_NDVI_FORCED_Cog',
+  label: 'NDVI',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: 'linear-gradient(to right, #e74c3c, #f1c40f, #2ecc71)'
+});
+
+loadXYZTiles({
+  id: 'a2-hillshade',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutchinson_Section2_DEM_50cm_Class2-3_Hillshade_Clipped_FORCED_Cog',
+  label: 'Hillshade (DEM)',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: '#888'
+});
+
+loadXYZTiles({
+  id: 'a2-hillshade-stream',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/HillShade_Hutch_Area2_ForStream_clipped_FORCED_Cog',
+  label: 'Hillshade (Surface)',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: '#aaa'
+});
+
+loadXYZTiles({
+  id: 'a2-slope',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutch_Section2_Slope_clipped_FORCED_Cog',
+  label: 'Slope',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: '#c8a870'
+});
+
+loadXYZTiles({
+  id: 'a2-aspect',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/Aspect_Section2_clipped_FORCED_Cog',
+  label: 'Aspect',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: 'linear-gradient(to right, #3498db, #f1c40f, #e74c3c, #2ecc71)'
+});
+
+loadXYZTiles({
+  id: 'a2-stream',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/Area2_Hutch_Stream_Cog',
+  label: 'Stream',
+  container: 'raster-toggles-area2',
+  defaultOn: false,
+  swatch: '#3498db'
+});
+
+loadXYZTiles({
+  id: 'a2-rgb',
+  path: 'data/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutchinson_Area2_L2_RGB_Ortho_Cog',
+  label: 'RGB Ortho',
+  container: 'raster-toggles-area2',
+  defaultOn: true,
+  swatch: '#5d8a5d'
+});
+
+// ══════════════════════════════════════════════════════
+//   VALIDATION PANEL
+//   Data sourced directly from the report (Table 1 and
+//   Figures 43 & 45). No values are invented here.
+//   All Area 2: 3838 trees total
+//   Flagged low-sap: 161 trees total
+// ══════════════════════════════════════════════════════
+
+const validationData = {
+  // All segmented trees in Area 2 (from report Figure 43)
+  allTrees: [
+    { label: 'Healthy',    count: 3309, color: stressColors.Green  },
+    { label: 'Mild',       count: 206,  color: stressColors.Yellow },
+    { label: 'Moderate',   count: 81,   color: stressColors.Orange },
+    { label: 'High',       count: 110,  color: stressColors.Red    },
+    { label: 'Leafless',   count: 132,  color: stressColors.NoLeaf }
+  ],
+  // Flagged low-sap trees (from report Figure 45)
+  flaggedTrees: [
+    { label: 'Healthy',    count: 147,  color: stressColors.Green  },
+    { label: 'Mild',       count: 5,    color: stressColors.Yellow },
+    { label: 'Moderate',   count: 3,    color: stressColors.Orange },
+    { label: 'High',       count: 5,    color: stressColors.Red    },
+    { label: 'Leafless',   count: 1,    color: stressColors.NoLeaf }
+  ]
+};
+
+function renderValBars(containerId, rows) {
+  const container = document.getElementById(containerId);
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  container.innerHTML = '';
+  rows.forEach(row => {
+    const pct = total > 0 ? (row.count / total * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'val-bar-row';
+    div.innerHTML =
+      '<span class="val-bar-label">' + row.label + '</span>' +
+      '<div class="val-bar-track">' +
+        '<div class="val-bar-fill" style="width:' + pct.toFixed(1) + '%;background:' + row.color + '"></div>' +
+      '</div>' +
+      '<span class="val-bar-pct">' + pct.toFixed(1) + '%</span>';
+    container.appendChild(div);
+  });
 }
 
-// ── 6. Load all layers ─────────────────────────────────
-// Tree polygons are loaded first so they sit below points.
-// Contours are loaded last with thin styling so they don't block clicks.
+renderValBars('val-all-bars',     validationData.allTrees);
+renderValBars('val-flagged-bars', validationData.flaggedTrees);
 
-// Area 1 – tree polygons
-loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Green.json',      'Area 1 - Healthy (Green)',   {color: stressColors.Green,  fillColor: stressColors.Green,  weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Yellow.json',     'Area 1 - Mild Stress',       {color: stressColors.Yellow, fillColor: stressColors.Yellow, weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Orange.json',     'Area 1 - Moderate Stress',   {color: stressColors.Orange, fillColor: stressColors.Orange, weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Red.json',        'Area 1 - High Stress',       {color: stressColors.Red,    fillColor: stressColors.Red,    weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Cyan_NoLeaf.json','Area 1 - Leafless',           {color: stressColors.NoLeaf, fillColor: stressColors.NoLeaf, weight:1, fillOpacity:0.5}, treePopup);
+// ══════════════════════════════════════════════════════
+//   LOAD VECTOR LAYERS (GeoJSON)
+// ══════════════════════════════════════════════════════
 
-// Area 2 – tree polygons
-loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Green.json',      'Area 2 - Healthy (Green)',   {color: stressColors.Green,  fillColor: stressColors.Green,  weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Yellow.json',     'Area 2 - Mild Stress',       {color: stressColors.Yellow, fillColor: stressColors.Yellow, weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Orange.json',     'Area 2 - Moderate Stress',   {color: stressColors.Orange, fillColor: stressColors.Orange, weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Red.json',        'Area 2 - High Stress',       {color: stressColors.Red,    fillColor: stressColors.Red,    weight:1, fillOpacity:0.5}, treePopup);
-loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Cyan_NoLeaf.json','Area 2 - Leafless',           {color: stressColors.NoLeaf, fillColor: stressColors.NoLeaf, weight:1, fillOpacity:0.5}, treePopup);
+// ── Area 1 tree polygons ──────────────────────────────
+loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Green.json',
+  'Area 1 – Healthy',       { color: stressColors.Green,  fillColor: stressColors.Green,  weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Green,  true);
+loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Yellow.json',
+  'Area 1 – Mild Stress',   { color: stressColors.Yellow, fillColor: stressColors.Yellow, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Yellow, true);
+loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Orange.json',
+  'Area 1 – Mod. Stress',   { color: stressColors.Orange, fillColor: stressColors.Orange, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Orange, true);
+loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Red.json',
+  'Area 1 – High Stress',   { color: stressColors.Red,    fillColor: stressColors.Red,    weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Red,    true);
+loadGeoJSON('data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Cyan_NoLeaf.json',
+  'Area 1 – Leafless',      { color: stressColors.NoLeaf, fillColor: stressColors.NoLeaf, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.NoLeaf, true);
 
-// Area 2 – field points (loaded after polygons so they render on top)
-loadGeoJSON('data/GeoJson/Area2/Points_Area2_All.json', 'Area 2 - Field Points', {fillColor: '#8e44ad'}, pointPopup);
+// ── Area 2 tree polygons ──────────────────────────────
+loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Green.json',
+  'Area 2 – Healthy',       { color: stressColors.Green,  fillColor: stressColors.Green,  weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Green,  true);
+loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Yellow.json',
+  'Area 2 – Mild Stress',   { color: stressColors.Yellow, fillColor: stressColors.Yellow, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Yellow, true);
+loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Orange.json',
+  'Area 2 – Mod. Stress',   { color: stressColors.Orange, fillColor: stressColors.Orange, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Orange, true);
+loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Red.json',
+  'Area 2 – High Stress',   { color: stressColors.Red,    fillColor: stressColors.Red,    weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.Red,    true);
+loadGeoJSON('data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Cyan_NoLeaf.json',
+  'Area 2 – Leafless',      { color: stressColors.NoLeaf, fillColor: stressColors.NoLeaf, weight:1, fillOpacity:0.5 }, treePopup, 'vector-toggles', stressColors.NoLeaf, true);
 
-// Contour lines (loaded last, non-interactive to avoid blocking polygon clicks)
-loadGeoJSON('data/GeoJson/Area1/Contour_Lines_1M_Area1.json', 'Area 1 - Contours', {color: '#555', weight: 0.5, fill: false, interactive: false}, contourPopup);
-loadGeoJSON('data/GeoJson/Area2/Contour_Lines_1M_Area2.json', 'Area 2 - Contours', {color: '#555', weight: 0.5, fill: false, interactive: false}, contourPopup);
+// ── Terrain & field data ──────────────────────────────
+loadGeoJSON('data/GeoJson/Area2/Points_Area2_All.json',
+  'Area 2 – Field Points', {}, pointPopup, 'terrain-toggles', '#8e44ad', true);
+
+loadGeoJSON('data/GeoJson/Area1/Contour_Lines_1M_Area1.json',
+  'Area 1 – Contours', { color: '#777', weight: 0.5, fill: false, interactive: false }, contourPopup, 'terrain-toggles', '#777', false);
+
+loadGeoJSON('data/GeoJson/Area2/Contour_Lines_1M_Area2.json',
+  'Area 2 – Contours', { color: '#777', weight: 0.5, fill: false, interactive: false }, contourPopup, 'terrain-toggles', '#777', false);
 
 </script>
 </body>
