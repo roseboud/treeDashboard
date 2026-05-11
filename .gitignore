@@ -5,3 +5,6 @@ data/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_No
 *.zip
 
 data/Working_Tiff_Layers/
+
+node_modules/
+dist/
