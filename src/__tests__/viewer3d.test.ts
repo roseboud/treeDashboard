@@ -3,19 +3,21 @@ import { initViewer3D } from '../viewer3d';
 
 describe('initViewer3D', () => {
   it('shows fallback message when both cloud.js and ept.json return 404', async () => {
+    // Mock fetch: returns ok:false (404) so fileExists() returns false for both probes
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
-    } as Response);
+      headers: { get: () => null },
+    } as unknown as Response);
 
     const container = document.createElement('div');
     const viewer = initViewer3D(container);
 
     viewer.load();
 
-    // Allow async tryLoad microtasks to settle
-    await new Promise<void>((resolve) => setTimeout(resolve, 50));
+    // Allow async tryLoad to settle (two awaited fetch calls + microtasks)
+    await new Promise<void>((resolve) => setTimeout(resolve, 100));
 
-    expect(container.textContent).toContain('Point cloud not found');
+    expect(container.textContent).toContain('No point cloud data found');
   });
 });

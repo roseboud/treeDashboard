@@ -4,40 +4,56 @@ export function initViewer3D(containerEl: HTMLElement): { load(): void; destroy(
   let loaded = false;
   let gl: WebGLRenderingContext | null = null;
 
-  async function tryLoad() {
+  /** Returns true only if the URL serves a non-HTML file that actually exists. */
+  async function fileExists(url: string): Promise<boolean> {
     try {
-      const r1 = await fetch('/potree/cloud.js', { method: 'HEAD' });
-      if (!r1.ok) throw new Error('cloud.js not found');
-      // Potree2 format path (placeholder)
-      console.log('Potree2 cloud.js found');
+      const res = await fetch(url, { method: 'HEAD' });
+      if (!res.ok) return false;
+      // Guard against Vite SPA fallback silently returning index.html (text/html)
+      const ct = res.headers.get('content-type') ?? '';
+      if (ct.startsWith('text/html')) return false;
+      return true;
     } catch {
-      try {
-        const r2 = await fetch('/potree/ept.json', { method: 'HEAD' });
-        if (!r2.ok) throw new Error('ept.json not found');
-        console.log('EPT/COPC ept.json found');
-      } catch {
-        containerEl.innerHTML = `
-          <div class="potree-placeholder">
-            <div class="potree-icon">☁</div>
-            <p>No point cloud data found</p>
-            <small>Place Potree2 output in <code>data/potree/</code></small>
-          </div>`;
-        console.warn('No Potree data found at /potree/');
-        return;
-      }
+      return false;
+    }
+  }
+
+  async function tryLoad() {
+    const hasCloud = await fileExists('/potree/cloud.js');
+    const hasEpt   = !hasCloud && await fileExists('/potree/ept.json');
+
+    if (!hasCloud && !hasEpt) {
+      containerEl.innerHTML = `
+        <div class="potree-placeholder">
+          <div class="potree-icon">☁</div>
+          <p>No point cloud data found</p>
+          <small>Place Potree2 output in <code>data/potree/</code></small>
+        </div>`;
+      console.warn('No Potree data found at /potree/ — showing placeholder');
+      return;
     }
 
-    // Minimal WebGL placeholder for 3D container
+    console.log(hasCloud ? 'Potree2 cloud.js found' : 'EPT/COPC ept.json found');
+
+    // ── Minimal WebGL placeholder (swap with real Potree2 viewer when ready) ──
     const canvas = document.createElement('canvas');
-    canvas.style.width = '100%';
+    // Set the backing buffer to the container's pixel dimensions (not just CSS %)
+    canvas.style.width  = '100%';
     canvas.style.height = '100%';
+    // Use a rAF so the layout has settled and clientWidth/Height are non-zero
+    requestAnimationFrame(() => {
+      canvas.width  = containerEl.clientWidth  || window.innerWidth;
+      canvas.height = containerEl.clientHeight || (window.innerHeight - 52);
+      gl = canvas.getContext('webgl');
+      if (gl) {
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.clearColor(0.06, 0.07, 0.09, 1);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+      }
+    });
+
     containerEl.innerHTML = '';
     containerEl.appendChild(canvas);
-    gl = canvas.getContext('webgl');
-    if (gl) {
-      gl.clearColor(0.1, 0.1, 0.1, 1);
-      gl.clear(gl.COLOR_BUFFER_BIT);
-    }
   }
 
   return {
