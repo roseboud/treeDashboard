@@ -119,28 +119,28 @@ export function initMap2D(mapEl: HTMLElement, statsEl: HTMLElement): Map {
   const panel = document.getElementById('layer-panel')!;
 
   const area1TreeFiles = [
-    { url: '/data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Green.json', name: 'Area 1 - Healthy (Green)', color: STRESS_COLORS.Green },
-    { url: '/data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Yellow.json', name: 'Area 1 - Mild Stress', color: STRESS_COLORS.Yellow },
-    { url: '/data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Orange.json', name: 'Area 1 - Moderate Stress', color: STRESS_COLORS.Orange },
-    { url: '/data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Red.json', name: 'Area 1 - High Stress', color: STRESS_COLORS.Red },
-    { url: '/data/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Cyan_NoLeaf.json', name: 'Area 1 - Leafless', color: STRESS_COLORS.NoLeaf },
+    { url: '/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Green.json', name: 'Area 1 - Healthy (Green)', color: STRESS_COLORS.Green },
+    { url: '/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Yellow.json', name: 'Area 1 - Mild Stress', color: STRESS_COLORS.Yellow },
+    { url: '/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Orange.json', name: 'Area 1 - Moderate Stress', color: STRESS_COLORS.Orange },
+    { url: '/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Red.json', name: 'Area 1 - High Stress', color: STRESS_COLORS.Red },
+    { url: '/GeoJson/Area1/Tree_Segmentation_with_Leaf_Classification_Area1_Cyan_NoLeaf.json', name: 'Area 1 - Leafless', color: STRESS_COLORS.NoLeaf },
   ];
 
   const area2TreeFiles = [
-    { url: '/data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Green.json', name: 'Area 2 - Healthy (Green)', color: STRESS_COLORS.Green },
-    { url: '/data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Yellow.json', name: 'Area 2 - Mild Stress', color: STRESS_COLORS.Yellow },
-    { url: '/data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Orange.json', name: 'Area 2 - Moderate Stress', color: STRESS_COLORS.Orange },
-    { url: '/data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Red.json', name: 'Area 2 - High Stress', color: STRESS_COLORS.Red },
-    { url: '/data/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Cyan_NoLeaf.json', name: 'Area 2 - Leafless', color: STRESS_COLORS.NoLeaf },
+    { url: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Green.json', name: 'Area 2 - Healthy (Green)', color: STRESS_COLORS.Green },
+    { url: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Yellow.json', name: 'Area 2 - Mild Stress', color: STRESS_COLORS.Yellow },
+    { url: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Orange.json', name: 'Area 2 - Moderate Stress', color: STRESS_COLORS.Orange },
+    { url: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Red.json', name: 'Area 2 - High Stress', color: STRESS_COLORS.Red },
+    { url: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_Cyan_NoLeaf.json', name: 'Area 2 - Leafless', color: STRESS_COLORS.NoLeaf },
   ];
 
   const contourFiles = [
-    { url: '/data/GeoJson/Area1/Contour_Lines_1M_Area1.json', name: 'Area 1 - Contours' },
-    { url: '/data/GeoJson/Area2/Contour_Lines_1M_Area2.json', name: 'Area 2 - Contours' },
+    { url: '/GeoJson/Area1/Contour_Lines_1M_Area1.json', name: 'Area 1 - Contours' },
+    { url: '/GeoJson/Area2/Contour_Lines_1M_Area2.json', name: 'Area 2 - Contours' },
   ];
 
   const pointFiles = [
-    { url: '/data/GeoJson/Area2/Points_Area2_All.json', name: 'Area 2 - Field Points' },
+    { url: '/GeoJson/Area2/Points_Area2_All.json', name: 'Area 2 - Field Points' },
   ];
 
   const allEntries: { url: string; name: string; color?: string; isContour?: boolean; isPoint?: boolean }[] = [

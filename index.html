@@ -8,14 +8,21 @@
 </head>
 <body>
   <div id="toolbar">
-    <span id="stats-panel">Loading...</span>
-    <button id="btn-3d">Switch to 3D ▸</button>
-    <button id="btn-2d" style="display:none">◂ Switch to 2D</button>
+    <span id="toolbar-title">🌳 Hutchinson Acres</span>
+    <span id="stats-panel">Trees: 0 &nbsp;|&nbsp; Points: 0 &nbsp;|&nbsp; Contours: 0</span>
+    <div id="toolbar-actions">
+      <button id="btn-3d" class="btn btn-secondary">Switch to 3D ▸</button>
+      <button id="btn-2d" class="btn btn-secondary" style="display:none">◂ Switch to 2D</button>
+    </div>
   </div>
   <div id="map"></div>
   <div id="potree-container"></div>
-  <div id="layer-panel"></div>
-  <div id="raster-panel"></div>
+  <div id="layer-panel">
+    <h4 class="panel-header">🗂 Layers</h4>
+  </div>
+  <div id="raster-panel">
+    <h4 class="panel-header">🛰 Raster COGs</h4>
+  </div>
   <div id="popup" class="ol-popup">
     <a id="popup-closer" href="#">✕</a>
     <div id="popup-content"></div>

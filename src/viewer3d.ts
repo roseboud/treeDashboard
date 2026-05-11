@@ -6,21 +6,23 @@ export function initViewer3D(containerEl: HTMLElement): { load(): void; destroy(
 
   async function tryLoad() {
     try {
-      const r1 = await fetch('/data/potree/cloud.js', { method: 'HEAD' });
+      const r1 = await fetch('/potree/cloud.js', { method: 'HEAD' });
       if (!r1.ok) throw new Error('cloud.js not found');
       // Potree2 format path (placeholder)
       console.log('Potree2 cloud.js found');
     } catch {
       try {
-        const r2 = await fetch('/data/potree/ept.json', { method: 'HEAD' });
+        const r2 = await fetch('/potree/ept.json', { method: 'HEAD' });
         if (!r2.ok) throw new Error('ept.json not found');
         console.log('EPT/COPC ept.json found');
       } catch {
-        const msg = document.createElement('p');
-        msg.textContent = 'Point cloud not found — place Potree2 output in data/potree/';
-        containerEl.innerHTML = '';
-        containerEl.appendChild(msg);
-        console.warn('No Potree data found at /data/potree/');
+        containerEl.innerHTML = `
+          <div class="potree-placeholder">
+            <div class="potree-icon">☁</div>
+            <p>No point cloud data found</p>
+            <small>Place Potree2 output in <code>data/potree/</code></small>
+          </div>`;
+        console.warn('No Potree data found at /potree/');
         return;
       }
     }
