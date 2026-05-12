@@ -23,6 +23,26 @@
   <div id="raster-panel">
     <h4 class="panel-header">🛰 Raster COGs</h4>
   </div>
+  <div id="filter-panel">
+    <h4 class="panel-header">Filters</h4>
+    <div class="panel-section">
+      <strong>Areas</strong>
+      <label><input type="checkbox" data-area-filter="1" checked /> Area 1</label>
+      <label><input type="checkbox" data-area-filter="2" checked /> Area 2</label>
+    </div>
+    <div class="panel-section">
+      <strong>Stress</strong>
+      <label><input type="checkbox" data-stress-filter="Green" checked /> Healthy</label>
+      <label><input type="checkbox" data-stress-filter="Yellow" checked /> Mild</label>
+      <label><input type="checkbox" data-stress-filter="Orange" checked /> Moderate</label>
+      <label><input type="checkbox" data-stress-filter="Red" checked /> High</label>
+      <label><input type="checkbox" data-stress-filter="NoLeaf" checked /> Leafless</label>
+    </div>
+  </div>
+  <div id="validation-panel">
+    <h4 class="panel-header">Validation</h4>
+    <div id="validation-content" class="panel-status">Loading field point comparison...</div>
+  </div>
   <div id="popup" class="ol-popup">
     <a id="popup-closer" href="#">✕</a>
     <div id="popup-content"></div>

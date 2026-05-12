@@ -20,22 +20,33 @@ function showFatalError(error: unknown): void {
   `;
 }
 
+function requireElement<T extends HTMLElement>(id: string, type: { new(): T }): T {
+  const element = document.getElementById(id);
+  if (!(element instanceof type)) {
+    throw new Error(`Missing required dashboard element: #${id}`);
+  }
+  return element;
+}
+
 function main() {
-  const mapEl           = document.getElementById('map') as HTMLElement;
-  const statsEl         = document.getElementById('stats-panel') as HTMLElement;
-  const potreeContainer = document.getElementById('potree-container') as HTMLElement;
-  const btn3d           = document.getElementById('btn-3d') as HTMLButtonElement;
-  const btn2d           = document.getElementById('btn-2d') as HTMLButtonElement;
+  const mapEl           = requireElement('map', HTMLElement);
+  const statsEl         = requireElement('stats-panel', HTMLElement);
+  const potreeContainer = requireElement('potree-container', HTMLElement);
+  const btn3d           = requireElement('btn-3d', HTMLButtonElement);
+  const btn2d           = requireElement('btn-2d', HTMLButtonElement);
   const layerPanel      = document.getElementById('layer-panel') as HTMLElement | null;
   const rasterPanel     = document.getElementById('raster-panel') as HTMLElement | null;
+  const filterPanel     = document.getElementById('filter-panel') as HTMLElement | null;
+  const validationPanel = document.getElementById('validation-panel') as HTMLElement | null;
 
   statsEl.textContent = 'Initializing dashboard…';
 
   const map    = initMap2D(mapEl, statsEl);
   const viewer = initViewer3D(potreeContainer);
 
+  let disposeRasterPanel: (() => void) | undefined;
   if (rasterPanel) {
-    addRasterLayerPanel(map, rasterPanel);
+    disposeRasterPanel = addRasterLayerPanel(map, rasterPanel);
   }
 
   requestAnimationFrame(() => map.updateSize());
@@ -46,6 +57,8 @@ function main() {
     mapEl.style.display = 'none';
     if (layerPanel)  layerPanel.style.visibility  = 'hidden';
     if (rasterPanel) rasterPanel.style.visibility = 'hidden';
+    if (filterPanel) filterPanel.style.visibility = 'hidden';
+    if (validationPanel) validationPanel.style.visibility = 'hidden';
 
     // Release OL WebGL context so Potree / our WebGL canvas can use it
     map.setTarget(undefined);
@@ -55,6 +68,7 @@ function main() {
     btn2d.style.display = 'inline-block';
 
     viewer.load();
+    requestAnimationFrame(() => viewer.resize());
   });
 
   btn2d.addEventListener('click', () => {
@@ -68,8 +82,15 @@ function main() {
     map.updateSize();               // force OL to recalculate viewport size
     if (layerPanel)  layerPanel.style.visibility  = 'visible';
     if (rasterPanel) rasterPanel.style.visibility = 'visible';
+    if (filterPanel) filterPanel.style.visibility = 'visible';
+    if (validationPanel) validationPanel.style.visibility = 'visible';
 
     btn3d.style.display = 'inline-block';
+  });
+
+  window.addEventListener('beforeunload', () => {
+    disposeRasterPanel?.();
+    viewer.destroy();
   });
 }
 

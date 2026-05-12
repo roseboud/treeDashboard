@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Map, View } from 'ol';
-import { loadGeoJSON, treePopup, type Stats } from '../map2d';
+import { loadGeoJSON } from '../map2d';
 import { Style } from 'ol/style';
+import type { VectorCatalogEntry } from '../catalog';
 
 const validGeoJSON = {
   type: 'FeatureCollection',
@@ -22,41 +23,44 @@ function makeMap() {
 }
 
 describe('loadGeoJSON', () => {
-  it('adds layer and increments stats on valid GeoJSON', async () => {
+  const entry: VectorCatalogEntry = {
+    id: 'test-tree',
+    label: 'Test Tree',
+    area: 1,
+    kind: 'tree',
+    path: '/GeoJson/test.json',
+    defaultVisible: true,
+    available: true,
+    stressClass: 'Red',
+  };
+
+  it('adds layer and returns loaded features on valid GeoJSON', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => validGeoJSON,
     } as Response);
 
     const map = makeMap();
-    const stats: Stats = { treeCount: 0, pointCount: 0, contourCount: 0 };
-    const statsEl = document.createElement('span');
 
-    const layer = await loadGeoJSON(map, '/data/test.json', new Style(), treePopup, stats, statsEl);
+    const loaded = await loadGeoJSON(map, entry, new Style());
 
-    expect(layer).toBeDefined();
+    expect(loaded).toBeDefined();
     expect(map.getLayers().getLength()).toBe(1);
-
-    // Simulate caller behaviour: increment stats from resolved layer
-    stats.treeCount += layer!.getSource()!.getFeatures().length;
-    expect(stats.treeCount).toBe(1);
+    expect(loaded!.features).toHaveLength(1);
+    expect(loaded!.entry.id).toBe('test-tree');
   });
 
-  it('does not throw and leaves stats unchanged on 404', async () => {
+  it('does not throw and returns undefined on 404', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 404,
     } as Response);
 
     const map = makeMap();
-    const stats: Stats = { treeCount: 0, pointCount: 0, contourCount: 0 };
-    const statsEl = document.createElement('span');
 
-    const layer = await loadGeoJSON(map, '/data/missing.json', new Style(), treePopup, stats, statsEl);
+    const loaded = await loadGeoJSON(map, { ...entry, path: '/GeoJson/missing.json' }, new Style());
 
-    expect(layer).toBeUndefined();
-    expect(stats.treeCount).toBe(0);
-    expect(stats.pointCount).toBe(0);
-    expect(stats.contourCount).toBe(0);
+    expect(loaded).toBeUndefined();
+    expect(map.getLayers().getLength()).toBe(0);
   });
 });

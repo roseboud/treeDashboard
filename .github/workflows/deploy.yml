@@ -25,17 +25,22 @@ jobs:
         with:
           lfs: true          # pull real GeoJSON content, not LFS pointers
 
-      - name: Assemble site
-        run: |
-          mkdir -p _site/data
-          cp index.html _site/
-          cp -r data/GeoJson _site/data/
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build dashboard
+        run: npm run build
 
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: _site
+          path: dist
 
       - id: deployment
         uses: actions/deploy-pages@v4

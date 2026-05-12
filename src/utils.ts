@@ -7,6 +7,9 @@ export const STRESS_COLORS: Record<string, string> = {
   NoLeaf: '#3498db',
 };
 
+export const STRESS_CLASS_ORDER = ['Green', 'Yellow', 'Orange', 'Red', 'NoLeaf'] as const;
+export type StressClassKey = (typeof STRESS_CLASS_ORDER)[number];
+
 // MAJORITY code → colour key (preserve mapping)
 const CLASS_MAP: Record<number, { label: string; colour: string }> = {
   1: { label: 'High Stress', colour: 'Red' },
@@ -15,6 +18,11 @@ const CLASS_MAP: Record<number, { label: string; colour: string }> = {
   5: { label: 'Leafless', colour: 'NoLeaf' },
   6: { label: 'Healthy', colour: 'Green' },
 };
+
+export function classKey(code: number | null | undefined): StressClassKey | undefined {
+  const info = code != null ? CLASS_MAP[code] : undefined;
+  return info?.colour as StressClassKey | undefined;
+}
 
 export function classColor(code: number | null | undefined): string {
   const info = code != null ? CLASS_MAP[code] : undefined;
