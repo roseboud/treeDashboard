@@ -8,6 +8,7 @@ data/Working_Tiff_Layers/
 
 node_modules/
 dist/
+.vite/
 
 # Local PotreeConverter output is required for local 3D demos, but the octree
 # binaries exceed GitHub's 2 GB per-object LFS limit. Keep these files locally
