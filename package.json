@@ -9,8 +9,10 @@
   },
   "dependencies": {
     "@types/ol": "^6.5.3",
+    "@types/three": "^0.138.0",
     "ol": "^10.9.0",
     "potree-loader": "^1.10.4",
+    "three": "^0.138.3",
     "typescript": "^6.0.3",
     "vite": "^8.0.12"
   },

@@ -8,3 +8,8 @@ data/Working_Tiff_Layers/
 
 node_modules/
 dist/
+
+# Local PotreeConverter output is required for local 3D demos, but the octree
+# binaries exceed GitHub's 2 GB per-object LFS limit. Keep these files locally
+# under data/Potree/ and distribute them outside GitHub if needed.
+data/Potree/
