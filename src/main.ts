@@ -2,6 +2,15 @@ import 'ol/ol.css';
 import { initMap2D } from './map2d';
 import { initViewer3D } from './viewer3d';
 import { addRasterLayerPanel } from './rasterLayers';
+import {
+  authenticateDemoUser,
+  canManageUsers,
+  canUseAnalysis,
+  clearSession,
+  loadSession,
+  saveSession,
+  type AuthSession,
+} from './auth';
 
 function showFatalError(error: unknown): void {
   const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
@@ -28,7 +37,52 @@ function requireElement<T extends HTMLElement>(id: string, type: { new(): T }): 
   return element;
 }
 
-function main() {
+function configureAuthUi(session: AuthSession): void {
+  const loginScreen = requireElement('login-screen', HTMLElement);
+  const userBadge = requireElement('user-badge', HTMLElement);
+  const logoutButton = requireElement('btn-logout', HTMLButtonElement);
+  const validationPanel = document.getElementById('validation-panel') as HTMLElement | null;
+  const filterPanel = document.getElementById('filter-panel') as HTMLElement | null;
+  const adminPanel = document.getElementById('admin-panel') as HTMLElement | null;
+
+  loginScreen.style.display = 'none';
+  userBadge.textContent = `${session.displayName} (${session.role})`;
+  logoutButton.addEventListener('click', () => {
+    clearSession();
+    window.location.reload();
+  });
+
+  if (!canUseAnalysis(session.role)) {
+    if (validationPanel) validationPanel.style.display = 'none';
+    if (filterPanel) filterPanel.style.display = 'none';
+  }
+
+  if (adminPanel) {
+    adminPanel.style.display = canManageUsers(session.role) ? 'block' : 'none';
+  }
+}
+
+function showLogin(onAuthenticated: (session: AuthSession) => void): void {
+  const loginScreen = requireElement('login-screen', HTMLElement);
+  const loginForm = requireElement('login-form', HTMLFormElement);
+  const usernameInput = requireElement('login-username', HTMLInputElement);
+  const passwordInput = requireElement('login-password', HTMLInputElement);
+  const errorEl = requireElement('login-error', HTMLElement);
+
+  loginScreen.style.display = 'flex';
+  loginForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const session = authenticateDemoUser(usernameInput.value, passwordInput.value);
+    if (!session) {
+      errorEl.textContent = 'Invalid demo username or password.';
+      return;
+    }
+    saveSession(session);
+    onAuthenticated(session);
+  });
+}
+
+function main(session: AuthSession) {
   const mapEl           = requireElement('map', HTMLElement);
   const statsEl         = requireElement('stats-panel', HTMLElement);
   const potreeContainer = requireElement('potree-container', HTMLElement);
@@ -39,6 +93,7 @@ function main() {
   const filterPanel     = document.getElementById('filter-panel') as HTMLElement | null;
   const validationPanel = document.getElementById('validation-panel') as HTMLElement | null;
 
+  configureAuthUi(session);
   statsEl.textContent = 'Initializing dashboard…';
 
   const map    = initMap2D(mapEl, statsEl);
@@ -98,7 +153,12 @@ window.addEventListener('error', (event) => showFatalError(event.error ?? event.
 window.addEventListener('unhandledrejection', (event) => showFatalError(event.reason));
 
 try {
-  main();
+  const session = loadSession();
+  if (session) {
+    main(session);
+  } else {
+    showLogin((authenticated) => main(authenticated));
+  }
 } catch (error) {
   showFatalError(error);
 }

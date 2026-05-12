@@ -7,12 +7,31 @@
   <link rel="stylesheet" href="/src/style.css" />
 </head>
 <body>
+  <div id="login-screen" class="login-screen">
+    <form id="login-form" class="login-card">
+      <h1>Hutchinson Acres</h1>
+      <p>Demo access for dashboard review. This frontend login is not production security.</p>
+      <label>
+        Username
+        <input id="login-username" name="username" autocomplete="username" value="researcher" />
+      </label>
+      <label>
+        Password
+        <input id="login-password" name="password" type="password" autocomplete="current-password" value="research123" />
+      </label>
+      <button type="submit" class="btn btn-primary">Log in</button>
+      <span id="login-error" class="login-error" aria-live="polite"></span>
+      <small>Demo users: admin/admin123, researcher/research123, viewer/viewer123</small>
+    </form>
+  </div>
   <div id="toolbar">
     <span id="toolbar-title">🌳 Hutchinson Acres</span>
     <span id="stats-panel">Trees: 0 &nbsp;|&nbsp; Points: 0 &nbsp;|&nbsp; Contours: 0</span>
     <div id="toolbar-actions">
+      <span id="user-badge" class="user-badge"></span>
       <button id="btn-3d" class="btn btn-secondary">Switch to 3D ▸</button>
       <button id="btn-2d" class="btn btn-secondary" style="display:none">◂ Switch to 2D</button>
+      <button id="btn-logout" class="btn btn-secondary">Logout</button>
     </div>
   </div>
   <div id="map"></div>
@@ -42,6 +61,14 @@
   <div id="validation-panel">
     <h4 class="panel-header">Validation</h4>
     <div id="validation-content" class="panel-status">Loading field point comparison...</div>
+  </div>
+  <div id="admin-panel" class="admin-panel">
+    <h4 class="panel-header">Demo IAM</h4>
+    <div class="panel-status">
+      <strong>Frontend-only roles</strong>
+      <span>admin, researcher, viewer</span>
+      <span>This does not secure data or GitHub Pages.</span>
+    </div>
   </div>
   <div id="popup" class="ol-popup">
     <a id="popup-closer" href="#">✕</a>

@@ -17,6 +17,78 @@ body {
   position: relative; /* reliable containing block for absolute children */
 }
 
+/* ── Demo Login ─────────────────────────────────────────────────────────── */
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 6000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: linear-gradient(135deg, #0f241b 0%, #1b4332 46%, #243b2f 100%);
+}
+
+.login-card {
+  width: min(390px, calc(100vw - 48px));
+  padding: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(183, 228, 199, 0.28);
+  background: #f8fbf7;
+  box-shadow: 0 18px 50px rgba(0,0,0,0.38);
+  color: #14251c;
+}
+
+.login-card h1 {
+  margin: 0 0 8px;
+  color: #1b4332;
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.login-card p {
+  margin: 0 0 18px;
+  color: #42594d;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.login-card label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #274739;
+}
+
+.login-card input {
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid #b9cfc3;
+  border-radius: 6px;
+  background: #fff;
+  color: #14251c;
+  font: inherit;
+}
+
+.login-card small {
+  display: block;
+  margin-top: 12px;
+  color: #60786b;
+  font-size: 11.5px;
+  line-height: 1.4;
+}
+
+.login-error {
+  display: block;
+  min-height: 18px;
+  margin-top: 8px;
+  color: #9c2415;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 /* ── Map & 3D containers ────────────────────────────────────────────────── */
 #map {
   position: absolute;
@@ -103,6 +175,28 @@ body {
   color: #fff;
 }
 
+.btn-primary {
+  width: 100%;
+  height: 40px;
+  background: #2d6a4f;
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: #1b4332;
+}
+
+.user-badge {
+  align-self: center;
+  max-width: 190px;
+  overflow: hidden;
+  color: #d8f3dc;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ── Side Panels ────────────────────────────────────────────────────────── */
 #layer-panel, #raster-panel, #filter-panel, #validation-panel {
   position: absolute;
@@ -135,6 +229,21 @@ body {
   right: 10px;
   max-height: 34vh;
   width: 320px;
+}
+
+.admin-panel {
+  position: absolute;
+  left: 10px;
+  bottom: 14px;
+  z-index: 1000;
+  width: 240px;
+  max-height: 26vh;
+  overflow: auto;
+  border: 1px solid #d0d0d0;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.97);
+  box-shadow: 0 3px 12px rgba(0,0,0,0.25);
+  font-size: 12.5px;
 }
 
 .panel-header {
@@ -376,7 +485,9 @@ body {
 }
 
 .potree-status-panel,
-.potree-actions {
+.potree-actions,
+.potree-help-panel,
+.potree-selection-panel {
   position: absolute;
   z-index: 5;
   pointer-events: auto;
@@ -411,6 +522,95 @@ body {
   color: #95d5b2;
   font-size: 12px;
   line-height: 1.45;
+}
+
+.potree-help-panel,
+.potree-selection-panel {
+  border: 1px solid rgba(149, 213, 178, 0.35);
+  border-radius: 8px;
+  background: rgba(15, 17, 23, 0.82);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.35);
+  color: #f8fbff;
+  backdrop-filter: blur(6px);
+}
+
+.potree-help-panel {
+  left: 14px;
+  top: 100px;
+  max-width: 360px;
+  padding: 10px 12px;
+}
+
+.potree-help-panel strong,
+.potree-help-panel span {
+  display: block;
+}
+
+.potree-help-panel strong {
+  color: #d8f3dc;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.potree-help-panel span {
+  color: #d8e9ee;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.potree-selection-panel {
+  right: 14px;
+  top: 14px;
+  width: min(330px, calc(100vw - 28px));
+  max-height: min(58vh, 520px);
+  overflow: auto;
+  padding: 12px;
+}
+
+.potree-selection-panel h3 {
+  margin: 0 0 8px;
+  color: #d8f3dc;
+  font-size: 14px;
+}
+
+.potree-selection-panel p {
+  margin: 0;
+  color: #d8e9ee;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.potree-selection-panel section {
+  padding: 8px 0;
+  border-top: 1px solid rgba(216, 243, 220, 0.16);
+}
+
+.potree-selection-panel section > strong {
+  display: block;
+  margin-bottom: 6px;
+  color: #95d5b2;
+  font-size: 11px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+}
+
+.selection-row {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.9fr) minmax(100px, 1.1fr);
+  gap: 8px;
+  padding: 3px 0;
+  color: #d8e9ee;
+  font-size: 11.5px;
+}
+
+.selection-row span {
+  color: #a8c7b7;
+}
+
+.selection-row b {
+  color: #ffffff;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .potree-actions {

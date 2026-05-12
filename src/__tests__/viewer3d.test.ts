@@ -39,4 +39,14 @@ describe('initViewer3D', () => {
     expect(container.querySelectorAll('.potree-placeholder')).toHaveLength(1);
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
+
+  it('exposes analysis-layer controls before the async viewer is loaded', () => {
+    const container = document.createElement('div');
+    const viewer = initViewer3D(container);
+
+    expect(() => viewer.setTreesVisible(false)).not.toThrow();
+    expect(() => viewer.setFieldPointsVisible(false)).not.toThrow();
+    expect(() => viewer.clearSelection()).not.toThrow();
+    expect(() => viewer.focusSelection()).not.toThrow();
+  });
 });
