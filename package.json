@@ -1,0 +1,25 @@
+{
+  "name": "treedashboard",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run --reporter=verbose"
+  },
+  "dependencies": {
+    "@types/ol": "^6.5.3",
+    "@types/three": "^0.138.0",
+    "ol": "^10.9.0",
+    "potree-loader": "^1.10.4",
+    "three": "^0.138.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.12"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.2",
+    "@vitest/coverage-v8": "^4.1.6",
+    "jsdom": "^29.1.1",
+    "vitest": "^4.1.6"
+  }
+}
