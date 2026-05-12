@@ -43,6 +43,11 @@ export const RASTER_CATALOG: RasterEntry[] = [
 export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): void {
   const cache = new globalThis.Map<string, WebGLTileLayer>();
 
+  const status = document.createElement('div');
+  status.className = 'panel-status';
+  status.textContent = `Raster layers ready (${RASTER_CATALOG.length})`;
+  panelEl.appendChild(status);
+
   RASTER_CATALOG.forEach((entry) => {
     const wrapper = document.createElement('div');
     const label = document.createElement('label');
@@ -56,6 +61,7 @@ export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): void {
 
     cb.addEventListener('change', () => {
       if (cb.checked) {
+        status.textContent = `Loading ${entry.label}…`;
         let layer = cache.get(entry.path);
         if (!layer) {
           if (entry.type === 'rgb') {
@@ -78,12 +84,15 @@ export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): void {
           }
           cache.set(entry.path, layer);
           map.addLayer(layer);
+          status.textContent = `${entry.label} enabled`;
         } else {
           layer.setVisible(true);
+          status.textContent = `${entry.label} enabled`;
         }
       } else {
         const layer = cache.get(entry.path);
         if (layer) layer.setVisible(false);
+        status.textContent = `${entry.label} hidden`;
       }
     });
   });

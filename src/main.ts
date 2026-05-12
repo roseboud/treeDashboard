@@ -1,6 +1,24 @@
+import 'ol/ol.css';
 import { initMap2D } from './map2d';
 import { initViewer3D } from './viewer3d';
 import { addRasterLayerPanel } from './rasterLayers';
+
+function showFatalError(error: unknown): void {
+  const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  console.error('Dashboard startup/runtime error', error);
+
+  let panel = document.getElementById('runtime-error-panel');
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'runtime-error-panel';
+    document.body.appendChild(panel);
+  }
+  panel.innerHTML = `
+    <strong>Dashboard error</strong>
+    <span>${message}</span>
+    <small>Open DevTools Console for details. If this is a fresh clone, run <code>npm install</code> and restart Vite with <code>--force</code>.</small>
+  `;
+}
 
 function main() {
   const mapEl           = document.getElementById('map') as HTMLElement;
@@ -11,12 +29,17 @@ function main() {
   const layerPanel      = document.getElementById('layer-panel') as HTMLElement | null;
   const rasterPanel     = document.getElementById('raster-panel') as HTMLElement | null;
 
+  statsEl.textContent = 'Initializing dashboard…';
+
   const map    = initMap2D(mapEl, statsEl);
   const viewer = initViewer3D(potreeContainer);
 
   if (rasterPanel) {
     addRasterLayerPanel(map, rasterPanel);
   }
+
+  requestAnimationFrame(() => map.updateSize());
+  window.setTimeout(() => map.updateSize(), 250);
 
   btn3d.addEventListener('click', () => {
     // Hide 2D map and its panels
@@ -50,4 +73,11 @@ function main() {
   });
 }
 
-main();
+window.addEventListener('error', (event) => showFatalError(event.error ?? event.message));
+window.addEventListener('unhandledrejection', (event) => showFatalError(event.reason));
+
+try {
+  main();
+} catch (error) {
+  showFatalError(error);
+}

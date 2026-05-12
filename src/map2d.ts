@@ -114,6 +114,7 @@ export function initMap2D(mapEl: HTMLElement, statsEl: HTMLElement): Map {
 
   // Stats
   const stats: Stats = { treeCount: 0, pointCount: 0, contourCount: 0 };
+  statsEl.textContent = 'Loading GeoJSON layers… 0 / 13';
 
   // Layer toggle panel
   const panel = document.getElementById('layer-panel')!;
@@ -151,6 +152,14 @@ export function initMap2D(mapEl: HTMLElement, statsEl: HTMLElement): Map {
   ];
 
   const layers: VectorLayer[] = [];
+  let completedLoads = 0;
+  let failedLoads = 0;
+
+  function updateLoadingStatus(): void {
+    const total = allEntries.length;
+    const suffix = failedLoads > 0 ? ` | Failed: ${failedLoads}` : '';
+    statsEl.textContent = `Loading GeoJSON layers… ${completedLoads} / ${total}${suffix}`;
+  }
 
   allEntries.forEach((entry) => {
     const wrapper = document.createElement('div');
@@ -178,6 +187,7 @@ export function initMap2D(mapEl: HTMLElement, statsEl: HTMLElement): Map {
     }
 
     loadGeoJSON(map, entry.url, style, entry.isPoint ? pointPopup : entry.isContour ? contourPopup : treePopup, stats, statsEl).then((layer) => {
+      completedLoads += 1;
       if (layer) {
         cb.addEventListener('change', () => layer.setVisible(cb.checked));
         layers.push(layer);
@@ -193,7 +203,22 @@ export function initMap2D(mapEl: HTMLElement, statsEl: HTMLElement): Map {
             map.getView().fit(extent, { padding: [40, 40, 40, 40] });
           }
         }
+      } else {
+        failedLoads += 1;
+        cb.checked = false;
+        cb.disabled = true;
+        wrapper.title = `Failed to load ${entry.url}`;
+        label.appendChild(document.createTextNode(' (failed)'));
+        updateLoadingStatus();
       }
+    }).catch((error) => {
+      completedLoads += 1;
+      failedLoads += 1;
+      cb.checked = false;
+      cb.disabled = true;
+      wrapper.title = `Error loading ${entry.url}: ${error instanceof Error ? error.message : String(error)}`;
+      label.appendChild(document.createTextNode(' (error)'));
+      updateLoadingStatus();
     });
   });
 
