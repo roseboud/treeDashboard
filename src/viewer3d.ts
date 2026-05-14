@@ -34,6 +34,11 @@ type SelectableRecord =
   | { type: 'tree'; record: TreeFeature3D }
   | { type: 'field-point'; record: FieldPoint3D };
 
+interface GroundBox {
+  box: Box3;
+  groundZ: number;
+}
+
 interface ViewerState {
   scene: Scene;
   camera: PerspectiveCamera;
@@ -357,10 +362,33 @@ function createSpriteMaterialPool(
   return spriteMaterials;
 }
 
+function groundPositionForTree(tree: TreeFeature3D, groundBoxes: GroundBox[]): [number, number, number] {
+  const x = tree.scenePosition[0];
+  const y = tree.scenePosition[1];
+  let match = groundBoxes.find(({ box }) =>
+    x >= box.min.x && x <= box.max.x && y >= box.min.y && y <= box.max.y
+  );
+
+  if (!match && groundBoxes.length > 0) {
+    match = groundBoxes.reduce((nearest, candidate) => {
+      const nearestX = (nearest.box.min.x + nearest.box.max.x) / 2;
+      const nearestY = (nearest.box.min.y + nearest.box.max.y) / 2;
+      const candidateX = (candidate.box.min.x + candidate.box.max.x) / 2;
+      const candidateY = (candidate.box.min.y + candidate.box.max.y) / 2;
+      const nearestDistance = Math.hypot(x - nearestX, y - nearestY);
+      const candidateDistance = Math.hypot(x - candidateX, y - candidateY);
+      return candidateDistance < nearestDistance ? candidate : nearest;
+    }, groundBoxes[0]);
+  }
+
+  return [x, y, match ? match.groundZ : tree.scenePosition[2]];
+}
+
 function createTreeGroup(
   THREE: typeof import('three'),
   trees: TreeFeature3D[],
-  combinedBox: Box3
+  combinedBox: Box3,
+  groundBoxes: GroundBox[]
 ): Group {
   const group = new THREE.Group();
   group.name = 'Procedural tree analysis layer';
@@ -383,11 +411,16 @@ function createTreeGroup(
   });
 
   trees.forEach((tree) => {
+    const groundedPosition = groundPositionForTree(tree, groundBoxes);
+    const renderTree: TreeFeature3D = {
+      ...tree,
+      scenePosition: groundedPosition,
+    };
     const variantIndex = Math.abs(
-      Math.round(tree.scenePosition[0] * 3.7 + tree.scenePosition[1] * 1.3)
+      Math.round(renderTree.scenePosition[0] * 3.7 + renderTree.scenePosition[1] * 1.3)
     ) % HUE_OFFSETS.length;
     const hueDelta = HUE_OFFSETS[variantIndex];
-    const spriteMat = spriteMaterials.get(`${tree.stressClass}:${hueDelta}`) ?? fallbackSpriteMaterial;
+    const spriteMat = spriteMaterials.get(`${renderTree.stressClass}:${hueDelta}`) ?? fallbackSpriteMaterial;
 
     const treeObject = new THREE.Group();
     const trunkH  = Math.max(tree.height * 0.42, 2.5);
@@ -399,7 +432,7 @@ function createTreeGroup(
     trunk.scale.set(Math.max(radius * 0.18, 0.4), trunkH, Math.max(radius * 0.18, 0.4));
     trunk.rotation.x = Math.PI / 2;
     trunk.position.z = trunkH / 2;
-    markSelectable(trunk, { type: 'tree', record: tree });
+    markSelectable(trunk, { type: 'tree', record: renderTree });
 
     // ── Canopy — three billboard sprites layered for depth ────────────────
     // 1) Lower skirt: wide and flat, anchors the crown at the break-of-branch
@@ -407,29 +440,29 @@ function createTreeGroup(
     const lowSize   = radius * 1.55;
     lowSprite.scale.set(lowSize, lowSize * 0.72, 1);
     lowSprite.position.set(0, 0, trunkH + canopyH * 0.20);
-    markSelectable(lowSprite, { type: 'tree', record: tree });
+    markSelectable(lowSprite, { type: 'tree', record: renderTree });
 
     // 2) Main crown: largest blob, centred on the canopy mass
     const mainSprite = new THREE.Sprite(spriteMat);
     const mainSize   = radius * 1.90;
     mainSprite.scale.set(mainSize, mainSize * 0.95, 1);
     mainSprite.position.set(0, 0, trunkH + canopyH * 0.48);
-    markSelectable(mainSprite, { type: 'tree', record: tree });
+    markSelectable(mainSprite, { type: 'tree', record: renderTree });
 
     // 3) Top accent: smaller blob, slightly offset — breaks symmetry, adds height
     const topSprite = new THREE.Sprite(spriteMat);
     const topSize   = radius * 1.05;
     topSprite.scale.set(topSize, topSize, 1);
     topSprite.position.set(radius * 0.12, 0, trunkH + canopyH * 0.82);
-    markSelectable(topSprite, { type: 'tree', record: tree });
+    markSelectable(topSprite, { type: 'tree', record: renderTree });
 
-    treeObject.position.set(tree.scenePosition[0], tree.scenePosition[1], tree.scenePosition[2]);
-    markSelectable(treeObject, { type: 'tree', record: tree });
+    treeObject.position.set(renderTree.scenePosition[0], renderTree.scenePosition[1], renderTree.scenePosition[2]);
+    markSelectable(treeObject, { type: 'tree', record: renderTree });
     treeObject.add(trunk, lowSprite, mainSprite, topSprite);
-    treeObject.userData.windPhase = (tree.scenePosition[0] * 0.17 +
-                                      tree.scenePosition[1] * 0.11) % (Math.PI * 2);
-    treeObject.userData.windFreq = 0.55 + ((Math.abs(tree.scenePosition[0]) % 7) / 7) * 0.30;
-    treeObject.userData.windAmp = 0.12 + ((Math.abs(tree.scenePosition[1]) % 5) / 5) * 0.10;
+    treeObject.userData.windPhase = (renderTree.scenePosition[0] * 0.17 +
+                                      renderTree.scenePosition[1] * 0.11) % (Math.PI * 2);
+    treeObject.userData.windFreq = 0.55 + ((Math.abs(renderTree.scenePosition[0]) % 7) / 7) * 0.30;
+    treeObject.userData.windAmp = 0.12 + ((Math.abs(renderTree.scenePosition[1]) % 5) / 5) * 0.10;
     for (const child of treeObject.children) {
       if ((child as { isSprite?: boolean }).isSprite) {
         child.userData.baseX = child.position.x;
@@ -477,11 +510,12 @@ function createFieldPointGroup(
 async function addAnalysisLayer(
   THREE: typeof import('three'),
   state: ViewerState,
-  actionsEl: HTMLElement
+  actionsEl: HTMLElement,
+  groundBoxes: GroundBox[]
 ): Promise<void> {
   try {
     const { trees, fieldPoints } = await loadTreeData3D();
-    state.treeGroup = createTreeGroup(THREE, trees, state.combinedBox);
+    state.treeGroup = createTreeGroup(THREE, trees, state.combinedBox, groundBoxes);
     state.fieldPointGroup = createFieldPointGroup(THREE, fieldPoints, state.combinedBox);
     state.scene.add(state.treeGroup, state.fieldPointGroup);
 
@@ -576,6 +610,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   const pointClouds: PointCloudOctree[] = [];
   const loadedDatasets: PotreeDataset[] = [];
   const combinedBox = new THREE.Box3();
+  const groundBoxes: GroundBox[] = [];
   const loadWarnings: string[] = [];
 
   for (const dataset of availableDatasets) {
@@ -594,7 +629,12 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
 
       pointCloud.updateMatrixWorld(true);
       const cloudBox = pointCloud.pcoGeometry.tightBoundingBox ?? pointCloud.pcoGeometry.boundingBox;
-      combinedBox.union(cloudBox.clone().translate(pointCloud.position));
+      const worldCloudBox = cloudBox.clone().translate(pointCloud.position);
+      combinedBox.union(worldCloudBox);
+      groundBoxes.push({
+        box: worldCloudBox,
+        groundZ: worldCloudBox.min.z + 1.2,
+      });
     } catch (error) {
       console.warn(`Failed to load ${dataset.label}`, error);
       loadWarnings.push(`${dataset.label} failed to load`);
@@ -708,7 +748,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   state.resizeHandler = resize;
   window.addEventListener('resize', resize);
 
-  await addAnalysisLayer(THREE, state, actionsEl);
+  await addAnalysisLayer(THREE, state, actionsEl, groundBoxes);
 
   const animate = () => {
     const elapsed = state.clock.getElapsedTime();

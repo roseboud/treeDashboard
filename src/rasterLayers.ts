@@ -45,10 +45,13 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
 
   let color: ExpressionValue;
   if (isNDVI) {
-    // NDVI: white (low) → red (high); input range 0–1
-    color = ['interpolate', ['linear'], ['band', 1],
-      0, [255, 255, 255, 1],
-      1, [255, 0,   0,   1],
+    // NDVI: transparent no-data, then white (low) → red (high); input range 0–1
+    color = ['case', ['>', ['band', 1], 0],
+      ['interpolate', ['linear'], ['band', 1],
+        0, [255, 255, 255, 1],
+        1, [255, 0,   0,   1],
+      ],
+      [0, 0, 0, 0],
     ];
   } else if (classColor) {
     // Leaf-classification binary mask: transparent background, class color for hits
@@ -58,10 +61,15 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
       [0, 0, 0, 0],       // background — fully transparent
     ];
   } else {
-    // Generic singleband (hillshade, slope, aspect, DEM, stream…): greyscale ramp
-    color = ['interpolate', ['linear'], ['band', 1],
-      0,   [0,   0,   0,   1],
-      255, [255, 255, 255, 1],
+    // Generic singleband (hillshade, slope, aspect, DEM, stream…):
+    // transparent no-data, then greyscale ramp. This prevents COG extents from
+    // painting black rectangles over the basemap where source pixels are empty.
+    color = ['case', ['>', ['band', 1], 0],
+      ['interpolate', ['linear'], ['band', 1],
+        1,   [1,   1,   1,   0.85],
+        255, [255, 255, 255, 0.85],
+      ],
+      [0, 0, 0, 0],
     ];
   }
 
