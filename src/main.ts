@@ -98,6 +98,17 @@ function main(session: AuthSession) {
 
   const map    = initMap2D(mapEl, statsEl);
   const viewer = initViewer3D(potreeContainer);
+  const stressFilterInputs = Array.from(
+    document.querySelectorAll<HTMLInputElement>('[data-stress-filter]')
+  );
+  const update3DStressFilter = () => {
+    const activeClasses = stressFilterInputs
+      .filter((input) => input.checked)
+      .map((input) => input.dataset.stressFilter)
+      .filter((value): value is string => Boolean(value));
+    viewer.setStressClassFilter(activeClasses);
+  };
+  stressFilterInputs.forEach((input) => input.addEventListener('change', update3DStressFilter));
 
   let disposeRasterPanel: (() => void) | undefined;
   if (rasterPanel) {
@@ -123,6 +134,7 @@ function main(session: AuthSession) {
     btn2d.style.display = 'inline-block';
 
     viewer.load();
+    update3DStressFilter();
     requestAnimationFrame(() => viewer.resize());
   });
 
@@ -144,6 +156,7 @@ function main(session: AuthSession) {
   });
 
   window.addEventListener('beforeunload', () => {
+    stressFilterInputs.forEach((input) => input.removeEventListener('change', update3DStressFilter));
     disposeRasterPanel?.();
     viewer.destroy();
   });

@@ -3,11 +3,22 @@ import type { ExpressionValue } from 'ol/expr/expression';
 import WebGLTileLayer from 'ol/layer/WebGLTile';
 import GeoTIFF from 'ol/source/GeoTIFF';
 import { RASTER_CATALOG, type RasterCatalogEntry } from './catalog';
+import { STRESS_COLORS } from './utils';
 
 export { RASTER_CATALOG };
 export type { RasterCatalogEntry };
 
 export type DisposeRasterPanel = () => void;
+
+const BACKGROUND_LABELS = ['Hillshade', 'DEM Hillshade', 'Slope', 'Aspect', 'Stream'];
+
+function isBackground(entry: RasterCatalogEntry): boolean {
+  return BACKGROUND_LABELS.some((label) => entry.label.includes(label.split(' ')[0]));
+}
+
+function isLeafOverlay(entry: RasterCatalogEntry): boolean {
+  return entry.label.toLowerCase().includes('leaf');
+}
 
 /**
  * Maps a label keyword to an RGBA color used as the "active pixel" tint for
@@ -16,13 +27,13 @@ export type DisposeRasterPanel = () => void;
  * at full opacity.  Colors match the STRESS_COLORS palette in utils.ts.
  */
 const LEAF_CLASS_COLORS: Array<{ keyword: string; rgba: [number, number, number, number] }> = [
-  { keyword: 'green',    rgba: [46,  204, 113, 1] },
-  { keyword: 'yellow',   rgba: [241, 196, 15,  1] },
-  { keyword: 'orange',   rgba: [230, 126, 34,  1] },
-  { keyword: 'red',      rgba: [231, 76,  60,  1] },
-  { keyword: 'leafless', rgba: [52,  152, 219, 1] },
-  { keyword: 'noleaf',   rgba: [52,  152, 219, 1] },
-  { keyword: 'teal',     rgba: [52,  152, 219, 1] },
+  { keyword: 'green',    rgba: [58,  158, 79,  1] },
+  { keyword: 'yellow',   rgba: [212, 160, 23,  1] },
+  { keyword: 'orange',   rgba: [204, 85,  0,   1] },
+  { keyword: 'red',      rgba: [176, 28,  28,  1] },
+  { keyword: 'leafless', rgba: [42,  138, 138, 1] },
+  { keyword: 'noleaf',   rgba: [42,  138, 138, 1] },
+  { keyword: 'teal',     rgba: [42,  138, 138, 1] },
 ];
 
 function leafClassColor(label: string): [number, number, number, number] | undefined {
@@ -82,25 +93,130 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
 export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): DisposeRasterPanel {
   const cache = new globalThis.Map<string, WebGLTileLayer>();
   const cleanups: Array<() => void> = [];
-  const availableCount = RASTER_CATALOG.filter((entry) => entry.available).length;
+  const availableBackgrounds = RASTER_CATALOG.filter((entry) => entry.available && isBackground(entry));
+  const leafOverlays = RASTER_CATALOG.filter((entry) => isLeafOverlay(entry));
 
   const status = document.createElement('div');
   status.className = 'panel-status';
-  status.textContent = `Raster layers ready (${availableCount} available, ${RASTER_CATALOG.length - availableCount} unavailable)`;
+  status.textContent = 'Choose one background context and any leaf overlays.';
   panelEl.appendChild(status);
 
-  RASTER_CATALOG.forEach((entry) => {
+  const legend = document.createElement('div');
+  legend.className = 'panel-status raster-legend-row';
+  const legendEntries: Array<[string, string]> = [
+    ['Green', 'Green'],
+    ['Yellow', 'Yellow'],
+    ['Orange', 'Orange'],
+    ['Red', 'Red'],
+    ['NoLeaf', 'NoLeaf'],
+  ];
+  legendEntries.forEach(([key, labelText]) => {
+    const item = document.createElement('span');
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    swatch.style.background = STRESS_COLORS[key];
+    item.appendChild(swatch);
+    item.appendChild(document.createTextNode(labelText));
+    legend.appendChild(item);
+  });
+  panelEl.appendChild(legend);
+
+  function layerFor(entry: RasterCatalogEntry): WebGLTileLayer {
+    let layer = cache.get(entry.path);
+    if (!layer) {
+      layer = createRasterLayer(entry);
+      layer.setVisible(false);
+      cache.set(entry.path, layer);
+      map.addLayer(layer);
+    }
+    return layer;
+  }
+
+  function setEntryVisible(entry: RasterCatalogEntry, visible: boolean): void {
+    layerFor(entry).setVisible(visible);
+  }
+
+  const contextSection = document.createElement('div');
+  contextSection.className = 'panel-section';
+  const contextTitle = document.createElement('strong');
+  contextTitle.textContent = 'Background Context';
+  contextSection.appendChild(contextTitle);
+
+  const noneLabel = document.createElement('label');
+  const noneRadio = document.createElement('input');
+  noneRadio.type = 'radio';
+  noneRadio.name = 'context-layer';
+  noneRadio.value = '';
+  noneLabel.appendChild(noneRadio);
+  noneLabel.appendChild(document.createTextNode(' None'));
+  contextSection.appendChild(noneLabel);
+  const onNoneChange = () => {
+    if (!noneRadio.checked) return;
+    availableBackgrounds.forEach((entry) => {
+      const layer = cache.get(entry.path);
+      if (layer) layer.setVisible(false);
+    });
+    status.textContent = 'Background context hidden';
+  };
+  noneRadio.addEventListener('change', onNoneChange);
+  cleanups.push(() => noneRadio.removeEventListener('change', onNoneChange));
+
+  const defaultBackground = availableBackgrounds.find((entry) => entry.defaultVisible) ?? availableBackgrounds[0];
+  availableBackgrounds.forEach((entry) => {
     const wrapper = document.createElement('div');
     wrapper.className = 'layer-row';
     const label = document.createElement('label');
+    const radio = document.createElement('input');
+    radio.type = 'radio';
+    radio.name = 'context-layer';
+    radio.value = entry.path;
+    radio.checked = entry === defaultBackground;
+    label.appendChild(radio);
+    label.appendChild(document.createTextNode(` ${entry.label.replace(/^Area ([12]) /, '$&- ')}`));
+    wrapper.appendChild(label);
+    contextSection.appendChild(wrapper);
+
+    const onChange = () => {
+      if (!radio.checked) return;
+      availableBackgrounds.forEach((candidate) => {
+        const layer = cache.get(candidate.path);
+        if (layer) layer.setVisible(false);
+      });
+      setEntryVisible(entry, true);
+      status.textContent = `${entry.label} enabled`;
+    };
+    radio.addEventListener('change', onChange);
+    cleanups.push(() => radio.removeEventListener('change', onChange));
+  });
+  noneRadio.checked = !defaultBackground;
+  panelEl.appendChild(contextSection);
+  if (defaultBackground) {
+    setEntryVisible(defaultBackground, true);
+  }
+
+  const overlaySection = document.createElement('div');
+  overlaySection.className = 'panel-section';
+  const overlayTitle = document.createElement('strong');
+  overlayTitle.textContent = 'Leaf Classification Overlays';
+  overlaySection.appendChild(overlayTitle);
+
+  leafOverlays.forEach((entry) => {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'layer-row';
+    const label = document.createElement('label');
+    const swatch = document.createElement('span');
+    swatch.className = 'swatch';
+    const classColor = leafClassColor(entry.label);
+    if (classColor) swatch.style.background = `rgb(${classColor[0]}, ${classColor[1]}, ${classColor[2]})`;
     const cb = document.createElement('input');
     cb.type = 'checkbox';
     cb.checked = entry.defaultVisible;
     cb.disabled = !entry.available;
+    label.appendChild(swatch);
     label.appendChild(cb);
-    label.appendChild(document.createTextNode(` ${entry.label}`));
+    label.appendChild(document.createTextNode(` ${entry.label.replace(/^Area ([12]) Leaf /, 'Area $1 - ')}`));
     wrapper.appendChild(label);
-    panelEl.appendChild(wrapper);
+    overlaySection.appendChild(wrapper);
 
     if (!entry.available) {
       wrapper.classList.add('is-disabled');
@@ -110,29 +226,14 @@ export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): DisposeRa
     }
 
     const onChange = () => {
-      if (cb.checked) {
-        status.textContent = `Loading ${entry.label}...`;
-        let layer = cache.get(entry.path);
-        if (!layer) {
-          layer = createRasterLayer(entry);
-          layer.setVisible(true);
-          cache.set(entry.path, layer);
-          map.addLayer(layer);
-        } else {
-          layer.setVisible(true);
-        }
-        status.textContent = `${entry.label} enabled`;
-      } else {
-        const layer = cache.get(entry.path);
-        if (layer) layer.setVisible(false);
-        status.textContent = `${entry.label} hidden`;
-      }
+      setEntryVisible(entry, cb.checked);
+      status.textContent = `${entry.label} ${cb.checked ? 'enabled' : 'hidden'}`;
     };
-
     cb.addEventListener('change', onChange);
     cleanups.push(() => cb.removeEventListener('change', onChange));
     if (entry.defaultVisible) onChange();
   });
+  panelEl.appendChild(overlaySection);
 
   return () => {
     cleanups.forEach((cleanup) => cleanup());

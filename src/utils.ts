@@ -1,10 +1,10 @@
 // ── Stress colour scheme (preserve exactly) ────────────────────────────────
 export const STRESS_COLORS: Record<string, string> = {
-  Green: '#2ecc71',
-  Yellow: '#f1c40f',
-  Orange: '#e67e22',
-  Red: '#e74c3c',
-  NoLeaf: '#3498db',
+  Green: '#3a9e4f',
+  Yellow: '#d4a017',
+  Orange: '#cc5500',
+  Red: '#b01c1c',
+  NoLeaf: '#2a8a8a',
 };
 
 export const STRESS_CLASS_ORDER = ['Green', 'Yellow', 'Orange', 'Red', 'NoLeaf'] as const;

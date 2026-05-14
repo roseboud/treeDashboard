@@ -34,11 +34,6 @@ type SelectableRecord =
   | { type: 'tree'; record: TreeFeature3D }
   | { type: 'field-point'; record: FieldPoint3D };
 
-interface GroundBox {
-  box: Box3;
-  groundZ: number;
-}
-
 interface ViewerState {
   scene: Scene;
   camera: PerspectiveCamera;
@@ -52,6 +47,7 @@ interface ViewerState {
   treeGroup?: Group;
   fieldPointGroup?: Group;
   selectionMarker?: Mesh;
+  scaleBar?: Group;
   combinedBox: Box3;
   selected?: SelectableRecord;
   raycaster: Raycaster;
@@ -70,6 +66,7 @@ export interface Viewer3D {
   destroy(): void;
   setTreesVisible(visible: boolean): void;
   setFieldPointsVisible(visible: boolean): void;
+  setStressClassFilter(classes: string[]): void;
   clearSelection(): void;
   focusSelection(): void;
 }
@@ -362,33 +359,26 @@ function createSpriteMaterialPool(
   return spriteMaterials;
 }
 
-function groundPositionForTree(tree: TreeFeature3D, groundBoxes: GroundBox[]): [number, number, number] {
-  const x = tree.scenePosition[0];
-  const y = tree.scenePosition[1];
-  let match = groundBoxes.find(({ box }) =>
-    x >= box.min.x && x <= box.max.x && y >= box.min.y && y <= box.max.y
-  );
-
-  if (!match && groundBoxes.length > 0) {
-    match = groundBoxes.reduce((nearest, candidate) => {
-      const nearestX = (nearest.box.min.x + nearest.box.max.x) / 2;
-      const nearestY = (nearest.box.min.y + nearest.box.max.y) / 2;
-      const candidateX = (candidate.box.min.x + candidate.box.max.x) / 2;
-      const candidateY = (candidate.box.min.y + candidate.box.max.y) / 2;
-      const nearestDistance = Math.hypot(x - nearestX, y - nearestY);
-      const candidateDistance = Math.hypot(x - candidateX, y - candidateY);
-      return candidateDistance < nearestDistance ? candidate : nearest;
-    }, groundBoxes[0]);
-  }
-
-  return [x, y, match ? match.groundZ : tree.scenePosition[2]];
+function createShadowTexture(THREE: typeof import('three')): import('three').CanvasTexture {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64;
+  canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gradient.addColorStop(0, 'rgba(0,0,0,1)');
+  gradient.addColorStop(0.65, 'rgba(0,0,0,0.55)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, 64, 64);
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  return texture;
 }
 
 function createTreeGroup(
   THREE: typeof import('three'),
   trees: TreeFeature3D[],
-  combinedBox: Box3,
-  groundBoxes: GroundBox[]
+  combinedBox: Box3
 ): Group {
   const group = new THREE.Group();
   group.name = 'Procedural tree analysis layer';
@@ -409,12 +399,19 @@ function createTreeGroup(
     opacity: 0.90,
     depthWrite: false,
   });
+  const shadowGeometry = new THREE.PlaneGeometry(1, 1);
+  const shadowMaterial = new THREE.MeshBasicMaterial({
+    color: 0x000000,
+    map: createShadowTexture(THREE),
+    opacity: 0.25,
+    transparent: true,
+    depthWrite: false,
+  });
 
   trees.forEach((tree) => {
-    const groundedPosition = groundPositionForTree(tree, groundBoxes);
     const renderTree: TreeFeature3D = {
       ...tree,
-      scenePosition: groundedPosition,
+      scenePosition: tree.scenePosition,
     };
     const variantIndex = Math.abs(
       Math.round(renderTree.scenePosition[0] * 3.7 + renderTree.scenePosition[1] * 1.3)
@@ -456,9 +453,22 @@ function createTreeGroup(
     topSprite.position.set(radius * 0.12, 0, trunkH + canopyH * 0.82);
     markSelectable(topSprite, { type: 'tree', record: renderTree });
 
+    const shadow = new THREE.Mesh(shadowGeometry, shadowMaterial);
+    shadow.scale.set(radius * 1.8, radius * 1.8, 1);
+    shadow.position.set(0, 0, 0.05);
+
     treeObject.position.set(renderTree.scenePosition[0], renderTree.scenePosition[1], renderTree.scenePosition[2]);
     markSelectable(treeObject, { type: 'tree', record: renderTree });
-    treeObject.add(trunk, lowSprite, mainSprite, topSprite);
+    treeObject.userData.stressClass = renderTree.stressClass;
+    treeObject.add(shadow, trunk, lowSprite, mainSprite, topSprite);
+    if (radius > 5) {
+      const extraSprite = new THREE.Sprite(spriteMat);
+      const extraSize = radius * 1.2;
+      extraSprite.scale.set(extraSize, extraSize * 0.6, 1);
+      extraSprite.position.set(-radius * 0.18, 0, trunkH + canopyH * 0.35);
+      markSelectable(extraSprite, { type: 'tree', record: renderTree });
+      treeObject.add(extraSprite);
+    }
     treeObject.userData.windPhase = (renderTree.scenePosition[0] * 0.17 +
                                       renderTree.scenePosition[1] * 0.11) % (Math.PI * 2);
     treeObject.userData.windFreq = 0.55 + ((Math.abs(renderTree.scenePosition[0]) % 7) / 7) * 0.30;
@@ -507,22 +517,56 @@ function createFieldPointGroup(
   return group;
 }
 
+function createTextSprite(
+  THREE: typeof import('three'),
+  label: string
+): import('three').Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 48;
+  const ctx = canvas.getContext('2d')!;
+  ctx.fillStyle = 'rgba(0,0,0,0.58)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.font = '700 24px Segoe UI, Arial, sans-serif';
+  ctx.fillStyle = '#ffffff';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, canvas.width / 2, canvas.height / 2);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  const material = new THREE.SpriteMaterial({ map: texture, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(16, 6, 1);
+  return sprite;
+}
+
+function createScaleBar(THREE: typeof import('three')): Group {
+  const scaleBar = new THREE.Group();
+  scaleBar.name = '50 m scale reference';
+  const bar = new THREE.Mesh(
+    new THREE.BoxGeometry(50, 0.3, 0.3),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  const label = createTextSprite(THREE, '50 m');
+  label.position.set(25, 0, 4);
+  scaleBar.add(bar, label);
+  return scaleBar;
+}
+
 async function addAnalysisLayer(
   THREE: typeof import('three'),
   state: ViewerState,
-  actionsEl: HTMLElement,
-  groundBoxes: GroundBox[]
+  actionsEl: HTMLElement
 ): Promise<void> {
   try {
     const { trees, fieldPoints } = await loadTreeData3D();
-    state.treeGroup = createTreeGroup(THREE, trees, state.combinedBox, groundBoxes);
+    state.treeGroup = createTreeGroup(THREE, trees, state.combinedBox);
     state.fieldPointGroup = createFieldPointGroup(THREE, fieldPoints, state.combinedBox);
     state.scene.add(state.treeGroup, state.fieldPointGroup);
 
     const markerGeometry = new THREE.TorusGeometry(6, 0.35, 8, 32);
     const markerMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
     state.selectionMarker = new THREE.Mesh(markerGeometry, markerMaterial);
-    state.selectionMarker.rotation.x = Math.PI / 2;
     state.selectionMarker.visible = false;
     state.scene.add(state.selectionMarker);
 
@@ -591,6 +635,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   scene.add(directional);
 
   const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 100_000);
+  camera.up.set(0, 0, 1);   // UTM data is Z-up; override Three.js Y-up default
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x0f1117, 1);
@@ -603,6 +648,8 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   controls.screenSpacePanning = false;
   controls.minDistance = 8;
   controls.maxDistance = 5_000;
+  controls.minPolarAngle = 0;
+  controls.maxPolarAngle = Math.PI / 2;
 
   const potree = new Potree();
   potree.pointBudget = POINT_BUDGET;
@@ -610,7 +657,6 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   const pointClouds: PointCloudOctree[] = [];
   const loadedDatasets: PotreeDataset[] = [];
   const combinedBox = new THREE.Box3();
-  const groundBoxes: GroundBox[] = [];
   const loadWarnings: string[] = [];
 
   for (const dataset of availableDatasets) {
@@ -631,10 +677,6 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
       const cloudBox = pointCloud.pcoGeometry.tightBoundingBox ?? pointCloud.pcoGeometry.boundingBox;
       const worldCloudBox = cloudBox.clone().translate(pointCloud.position);
       combinedBox.union(worldCloudBox);
-      groundBoxes.push({
-        box: worldCloudBox,
-        groundZ: worldCloudBox.min.z + 1.2,
-      });
     } catch (error) {
       console.warn(`Failed to load ${dataset.label}`, error);
       loadWarnings.push(`${dataset.label} failed to load`);
@@ -655,6 +697,8 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   );
 
   const clock = new THREE.Clock();
+  const scaleBar = createScaleBar(THREE);
+  scene.add(scaleBar);
   const state: ViewerState = {
     scene,
     camera,
@@ -665,6 +709,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
     datasets: loadedDatasets,
     overlayEl,
     selectionEl,
+    scaleBar,
     combinedBox,
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
@@ -741,6 +786,14 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
       cloud.visible = !cloud.visible;
     }));
   });
+  actionsEl.appendChild(createButton('HD / Performance', () => {
+    potree.pointBudget = potree.pointBudget === POINT_BUDGET ? 500_000 : POINT_BUDGET;
+    setOverlay(
+      overlayEl,
+      'Point budget updated',
+      potree.pointBudget === POINT_BUDGET ? 'HD mode: 2.0M points' : 'Performance mode: 0.5M points'
+    );
+  }));
 
   resize();
   state.resizeObserver = new ResizeObserver(resize);
@@ -748,11 +801,12 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   state.resizeHandler = resize;
   window.addEventListener('resize', resize);
 
-  await addAnalysisLayer(THREE, state, actionsEl, groundBoxes);
+  await addAnalysisLayer(THREE, state, actionsEl);
 
   const animate = () => {
     const elapsed = state.clock.getElapsedTime();
     controls.update();
+    state.scaleBar?.position.copy(controls.target).add(new THREE.Vector3(-30, -30, 0));
 
     if (state.treeGroup?.visible) {
       for (const treeObj of state.treeGroup.children) {
@@ -841,6 +895,13 @@ export function initViewer3D(containerEl: HTMLElement): Viewer3D {
     setFieldPointsVisible(visible: boolean) {
       if (state?.fieldPointGroup) state.fieldPointGroup.visible = visible;
     },
+    setStressClassFilter(classes: string[]) {
+      const active = new Set(classes);
+      state?.treeGroup?.children.forEach((treeObject) => {
+        const stressClass = treeObject.userData.stressClass as string | undefined;
+        treeObject.visible = !stressClass || active.has(stressClass);
+      });
+    },
     clearSelection() {
       if (!state) return;
       state.selected = undefined;
@@ -862,6 +923,7 @@ export function initViewer3D(containerEl: HTMLElement): Viewer3D {
       if (state?.treeGroup) disposeObject(state.treeGroup);
       if (state?.fieldPointGroup) disposeObject(state.fieldPointGroup);
       if (state?.selectionMarker) disposeObject(state.selectionMarker);
+      if (state?.scaleBar) disposeObject(state.scaleBar);
       state?.pointClouds.forEach((cloud) => cloud.dispose());
       state?.renderer.dispose();
       state?.renderer.domElement.remove();
