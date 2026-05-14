@@ -21,7 +21,7 @@ import {
   type SelectionDetails,
   type TreeFeature3D,
 } from './treeData3d';
-import { STRESS_COLORS, type StressClassKey } from './utils';
+import { STRESS_CLASS_ORDER, STRESS_COLORS, type StressClassKey } from './utils';
 
 interface PotreeDataset {
   id: string;
@@ -52,6 +52,7 @@ interface ViewerState {
   raycaster: Raycaster;
   pointer: Vector2;
   clickHandler: (event: PointerEvent) => void;
+  clock: import('three').Clock;
   animationFrame: number | null;
   resizeObserver?: ResizeObserver;
   resizeHandler?: () => void;
@@ -70,6 +71,7 @@ export interface Viewer3D {
 
 const POINT_BUDGET = 2_000_000;
 const UNKNOWN_COLOR = '#999999';
+const HUE_OFFSETS = [-15, -10, -5, 0, 5, 10, 15] as const;
 
 export const POTREE_DATASETS: PotreeDataset[] = [
   {
@@ -122,6 +124,52 @@ function formatMillions(points: number): string {
 
 function colorForClass(stressClass: StressClassKey | 'Unknown'): string {
   return stressClass === 'Unknown' ? UNKNOWN_COLOR : STRESS_COLORS[stressClass];
+}
+
+function hslShift(hex: string, hueDelta: number): number {
+  const clean = hex.replace('#', '').trim();
+  const expanded = clean.length === 3
+    ? clean.split('').map((char) => `${char}${char}`).join('')
+    : clean;
+  const parsed = Number.parseInt(expanded, 16);
+  if (!Number.isFinite(parsed)) return 0x999999;
+
+  const r = ((parsed >> 16) & 255) / 255;
+  const g = ((parsed >> 8) & 255) / 255;
+  const b = (parsed & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  const lightness = (max + min) / 2;
+
+  let hue = 0;
+  let saturation = 0;
+  if (delta > 0) {
+    saturation = delta / (1 - Math.abs(2 * lightness - 1));
+    if (max === r) hue = 60 * (((g - b) / delta) % 6);
+    else if (max === g) hue = 60 * ((b - r) / delta + 2);
+    else hue = 60 * ((r - g) / delta + 4);
+  }
+
+  hue = (hue + hueDelta) % 360;
+  if (hue < 0) hue += 360;
+
+  const chroma = (1 - Math.abs(2 * lightness - 1)) * saturation;
+  const x = chroma * (1 - Math.abs((hue / 60) % 2 - 1));
+  const m = lightness - chroma / 2;
+  let rp = 0;
+  let gp = 0;
+  let bp = 0;
+
+  if (hue < 60) [rp, gp, bp] = [chroma, x, 0];
+  else if (hue < 120) [rp, gp, bp] = [x, chroma, 0];
+  else if (hue < 180) [rp, gp, bp] = [0, chroma, x];
+  else if (hue < 240) [rp, gp, bp] = [0, x, chroma];
+  else if (hue < 300) [rp, gp, bp] = [x, 0, chroma];
+  else [rp, gp, bp] = [chroma, 0, x];
+
+  const toByte = (value: number) => Math.min(255, Math.max(0, Math.round((value + m) * 255)));
+  return (toByte(rp) << 16) | (toByte(gp) << 8) | toByte(bp);
 }
 
 function fitCameraToBox(
@@ -239,6 +287,76 @@ function disposeObject(object: Object3D): void {
   });
 }
 
+/**
+ * Generates a soft circular foliage billboard texture on a canvas.
+ * Pure white so it can be tinted to any stress-class color via SpriteMaterial.color.
+ * The peripheral bumps break up the silhouette into a natural leafy outline.
+ */
+function createFoliageTexture(THREE: typeof import('three')): import('three').CanvasTexture {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d')!;
+  const cx = size / 2;
+  const cy = size / 2;
+
+  // Main body: radial fade from opaque centre to transparent edge
+  const body = ctx.createRadialGradient(cx, cy, 0, cx, cy, cx);
+  body.addColorStop(0,    'rgba(255,255,255,1.0)');
+  body.addColorStop(0.45, 'rgba(255,255,255,0.95)');
+  body.addColorStop(0.72, 'rgba(255,255,255,0.50)');
+  body.addColorStop(1.0,  'rgba(255,255,255,0.0)');
+  ctx.fillStyle = body;
+  ctx.beginPath();
+  ctx.arc(cx, cy, cx, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Peripheral leafy bump clusters — 8 positions, offset to break the circle silhouette
+  const bumpDeg = [0, 45, 90, 135, 180, 225, 270, 315];
+  for (const deg of bumpDeg) {
+    const rad = (deg * Math.PI) / 180;
+    const bx = cx + Math.cos(rad) * cx * 0.40;
+    const by = cy + Math.sin(rad) * cy * 0.40;
+    const br = cx * 0.20;
+    const bg = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+    bg.addColorStop(0,   'rgba(255,255,255,0.70)');
+    bg.addColorStop(1.0, 'rgba(255,255,255,0.0)');
+    ctx.fillStyle = bg;
+    ctx.beginPath();
+    ctx.arc(bx, by, br, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.needsUpdate = true;
+  return tex;
+}
+
+type SpriteMaterialPool = Map<string, import('three').SpriteMaterial>;
+
+function createSpriteMaterialPool(
+  THREE: typeof import('three'),
+  foliageTex: import('three').CanvasTexture
+): SpriteMaterialPool {
+  // SpriteMaterial pool: seven hue variants for each stress class, shared by all trees.
+  const spriteMaterials: SpriteMaterialPool = new Map();
+  STRESS_CLASS_ORDER.forEach((stressClass) => {
+    HUE_OFFSETS.forEach((hueDelta) => {
+      const spriteMaterial = new THREE.SpriteMaterial({
+        map: foliageTex,
+        // SpriteMaterial.color accepts a 0xRRGGBB integer, so hslShift returns a number.
+        color: hslShift(STRESS_COLORS[stressClass], hueDelta),
+        transparent: true,
+        opacity: 0.90,
+        depthWrite: false,
+      });
+      spriteMaterials.set(`${stressClass}:${hueDelta}`, spriteMaterial);
+    });
+  });
+  return spriteMaterials;
+}
+
 function createTreeGroup(
   THREE: typeof import('three'),
   trees: TreeFeature3D[],
@@ -247,44 +365,77 @@ function createTreeGroup(
   const group = new THREE.Group();
   group.name = 'Procedural tree analysis layer';
 
-  const trunkGeometry = new THREE.CylinderGeometry(0.38, 0.52, 1, 8);
-  const canopyGeometry = new THREE.ConeGeometry(1, 1.6, 10);
-  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x7b4a22, roughness: 0.85 });
-  const canopyMaterials = new Map<string, Material>();
+  // Shared trunk geometry — cylinder, Z-up (rotated in place)
+  const trunkGeometry = new THREE.CylinderGeometry(0.3, 0.5, 1, 7);
+  const trunkMaterial = new THREE.MeshStandardMaterial({ color: 0x5c3317, roughness: 0.92 });
+
+  // Single foliage texture shared across all sprites; tinted per stress class via material.color
+  const foliageTex = createFoliageTexture(THREE);
+  // SpriteMaterial variants are pre-baked once, then reused by deterministic tree position.
+  const spriteMaterials = createSpriteMaterialPool(THREE, foliageTex);
+  // Fallback SpriteMaterial is shared by every unexpected class, never created per tree.
+  const fallbackSpriteMaterial = new THREE.SpriteMaterial({
+    map: foliageTex,
+    color: hslShift(UNKNOWN_COLOR, 0),
+    transparent: true,
+    opacity: 0.90,
+    depthWrite: false,
+  });
 
   trees.forEach((tree) => {
-    const materialKey = tree.stressClass;
-    let canopyMaterial = canopyMaterials.get(materialKey);
-    if (!canopyMaterial) {
-      canopyMaterial = new THREE.MeshStandardMaterial({
-        color: colorForClass(tree.stressClass),
-        roughness: 0.72,
-        metalness: 0.02,
-      });
-      canopyMaterials.set(materialKey, canopyMaterial);
-    }
+    const variantIndex = Math.abs(
+      Math.round(tree.scenePosition[0] * 3.7 + tree.scenePosition[1] * 1.3)
+    ) % HUE_OFFSETS.length;
+    const hueDelta = HUE_OFFSETS[variantIndex];
+    const spriteMat = spriteMaterials.get(`${tree.stressClass}:${hueDelta}`) ?? fallbackSpriteMaterial;
 
     const treeObject = new THREE.Group();
-    const trunkHeight = Math.max(tree.height * 0.44, 2.2);
-    const canopyHeight = Math.max(tree.height * 0.7, 4);
-    const radius = Math.min(Math.max(tree.crownRadius, 1.2), 7);
+    const trunkH  = Math.max(tree.height * 0.42, 2.5);
+    const canopyH = Math.max(tree.height * 0.65, 4.5);
+    const radius  = Math.min(Math.max(tree.crownRadius, 1.5), 8.0);
 
+    // ── Trunk ──────────────────────────────────────────────────────────────
     const trunk = new THREE.Mesh(trunkGeometry, trunkMaterial);
-    trunk.scale.set(Math.max(radius * 0.2, 0.45), trunkHeight, Math.max(radius * 0.2, 0.45));
+    trunk.scale.set(Math.max(radius * 0.18, 0.4), trunkH, Math.max(radius * 0.18, 0.4));
     trunk.rotation.x = Math.PI / 2;
-    trunk.position.z = trunkHeight / 2;
-    trunk.castShadow = false;
+    trunk.position.z = trunkH / 2;
     markSelectable(trunk, { type: 'tree', record: tree });
 
-    const canopy = new THREE.Mesh(canopyGeometry, canopyMaterial);
-    canopy.scale.set(radius, canopyHeight, radius);
-    canopy.rotation.x = Math.PI / 2;
-    canopy.position.z = trunkHeight + canopyHeight / 2 - 0.4;
-    markSelectable(canopy, { type: 'tree', record: tree });
+    // ── Canopy — three billboard sprites layered for depth ────────────────
+    // 1) Lower skirt: wide and flat, anchors the crown at the break-of-branch
+    const lowSprite = new THREE.Sprite(spriteMat);
+    const lowSize   = radius * 1.55;
+    lowSprite.scale.set(lowSize, lowSize * 0.72, 1);
+    lowSprite.position.set(0, 0, trunkH + canopyH * 0.20);
+    markSelectable(lowSprite, { type: 'tree', record: tree });
+
+    // 2) Main crown: largest blob, centred on the canopy mass
+    const mainSprite = new THREE.Sprite(spriteMat);
+    const mainSize   = radius * 1.90;
+    mainSprite.scale.set(mainSize, mainSize * 0.95, 1);
+    mainSprite.position.set(0, 0, trunkH + canopyH * 0.48);
+    markSelectable(mainSprite, { type: 'tree', record: tree });
+
+    // 3) Top accent: smaller blob, slightly offset — breaks symmetry, adds height
+    const topSprite = new THREE.Sprite(spriteMat);
+    const topSize   = radius * 1.05;
+    topSprite.scale.set(topSize, topSize, 1);
+    topSprite.position.set(radius * 0.12, 0, trunkH + canopyH * 0.82);
+    markSelectable(topSprite, { type: 'tree', record: tree });
 
     treeObject.position.set(tree.scenePosition[0], tree.scenePosition[1], tree.scenePosition[2]);
     markSelectable(treeObject, { type: 'tree', record: tree });
-    treeObject.add(trunk, canopy);
+    treeObject.add(trunk, lowSprite, mainSprite, topSprite);
+    treeObject.userData.windPhase = (tree.scenePosition[0] * 0.17 +
+                                      tree.scenePosition[1] * 0.11) % (Math.PI * 2);
+    treeObject.userData.windFreq = 0.55 + ((Math.abs(tree.scenePosition[0]) % 7) / 7) * 0.30;
+    treeObject.userData.windAmp = 0.12 + ((Math.abs(tree.scenePosition[1]) % 5) / 5) * 0.10;
+    for (const child of treeObject.children) {
+      if ((child as { isSprite?: boolean }).isSprite) {
+        child.userData.baseX = child.position.x;
+        child.userData.baseY = child.position.y;
+      }
+    }
     group.add(treeObject);
     combinedBox.expandByPoint(treeObject.position);
   });
@@ -463,6 +614,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
     `${formatMillions(loadedDatasets.reduce((sum, d) => sum + d.points, 0))} source points · budget ${formatMillions(POINT_BUDGET)}${loadWarnings.length ? ` · ${loadWarnings.join(', ')}` : ''}`
   );
 
+  const clock = new THREE.Clock();
   const state: ViewerState = {
     scene,
     camera,
@@ -477,6 +629,7 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
     raycaster: new THREE.Raycaster(),
     pointer: new THREE.Vector2(),
     clickHandler: () => undefined,
+    clock,
     animationFrame: null,
     initialized: true,
   };
@@ -558,7 +711,26 @@ async function initPotreeScene(containerEl: HTMLElement, availableDatasets: Potr
   await addAnalysisLayer(THREE, state, actionsEl);
 
   const animate = () => {
+    const elapsed = state.clock.getElapsedTime();
     controls.update();
+
+    if (state.treeGroup?.visible) {
+      for (const treeObj of state.treeGroup.children) {
+        const phase = (treeObj.userData.windPhase as number) ?? 0;
+        const freq = (treeObj.userData.windFreq as number) ?? 0.6;
+        const amp = (treeObj.userData.windAmp as number) ?? 0.15;
+        const swayX = Math.sin(elapsed * freq + phase) * amp;
+        const swayY = Math.sin(elapsed * freq * 0.7 + phase) * amp * 0.6;
+
+        for (const child of treeObj.children) {
+          if ((child as { isSprite?: boolean }).isSprite) {
+            child.position.x = ((child.userData.baseX as number | undefined) ?? 0) + swayX;
+            child.position.y = ((child.userData.baseY as number | undefined) ?? 0) + swayY;
+          }
+        }
+      }
+    }
+
     potree.updatePointClouds(pointClouds, camera, renderer);
     renderer.clear();
     renderer.render(scene, camera);

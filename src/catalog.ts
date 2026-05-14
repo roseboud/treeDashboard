@@ -53,7 +53,7 @@ export const VECTOR_CATALOG: VectorCatalogEntry[] = [
 
 export const RASTER_CATALOG: RasterCatalogEntry[] = [
   { id: 'a1-ndvi', label: 'Area 1 NDVI', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_APT_Area1_NDVI_FORCED_Cog.tif', defaultVisible: false, available: false },
-  { id: 'a1-hillshade', label: 'Area 1 Hillshade', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutch_Section1_Hillshade_ForContours_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
+  { id: 'a1-hillshade', label: 'Area 1 Hillshade', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutch_Section1_Hillshade_ForContours_clipped_FORCED_Cog.tif', defaultVisible: true, available: true },
   { id: 'a1-slope', label: 'Area 1 Slope', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutch_Section1_Slope_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
   { id: 'a1-aspect', label: 'Area 1 Aspect', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/Hutch_Section1_Aspect_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
   { id: 'a1-rgb-part1', label: 'Area 1 RGB Part 1', area: 1, kind: 'rgb', path: '/COGs_Tiff/Mercator_Versions/Area1/20250919_Hutchinson_Area1_L2_Photo_RGB_NoHoleFilling_Fill_RC_Ortho_Cog_part1.tif', defaultVisible: false, available: false },
@@ -67,7 +67,7 @@ export const RASTER_CATALOG: RasterCatalogEntry[] = [
   { id: 'a1-leaf-yellow', label: 'Area 1 Leaf Yellow', area: 1, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area1/Area1_LeafClassification_Yellow_Cog.tif', defaultVisible: false, available: true },
 
   { id: 'a2-ndvi', label: 'Area 2 NDVI', area: 2, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutchinson_APT_Area2_NDVI_FORCED_Cog.tif', defaultVisible: false, available: false },
-  { id: 'a2-hillshade', label: 'Area 2 Hillshade', area: 2, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area2/HillShade_Hutch_Area2_ForStream_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
+  { id: 'a2-hillshade', label: 'Area 2 Hillshade', area: 2, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area2/HillShade_Hutch_Area2_ForStream_clipped_FORCED_Cog.tif', defaultVisible: true, available: true },
   { id: 'a2-slope', label: 'Area 2 Slope', area: 2, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutch_Section2_Slope_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
   { id: 'a2-aspect', label: 'Area 2 Aspect', area: 2, kind: 'singleband', path: '/COGs_Tiff/Mercator_Versions/Area2/Aspect_Section2_clipped_FORCED_Cog.tif', defaultVisible: false, available: true },
   { id: 'a2-rgb', label: 'Area 2 RGB', area: 2, kind: 'rgb', path: '/COGs_Tiff/Mercator_Versions/Area2/20250919_Hutchinson_Area2_L2_RGB_Ortho_Cog.tif', defaultVisible: false, available: false },
