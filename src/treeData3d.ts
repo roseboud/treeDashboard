@@ -55,8 +55,106 @@ const TREE_SOURCES = [
   { area: 2 as const, path: '/GeoJson/Area2/Tree_Segmentation_with_Leaf_Classification_Area2_All.json', layer: 'Area 2 Classified Trees' },
 ];
 
+const CONTOUR_SOURCES: Record<1 | 2, string> = {
+  1: '/GeoJson/Area1/Contour_Lines_1M_Area1.json',
+  2: '/GeoJson/Area2/Contour_Lines_1M_Area2.json',
+};
+
+/** Fallback elevations per area (metres, from Potree bbox stats) used only when
+ *  the contour lookup fails to find any nearby vertex. */
+const AREA_FALLBACK_Z: Record<1 | 2, number> = {
+  1: 203,   // Area 1 contours span 185–221 m; median ~203 m
+  2: 234,   // Area 2 contours span 204–248 m; matches field-point Ortho mean
+};
+
 const FIELD_POINTS_PATH = '/GeoJson/Area2/Points_Area2_All.json';
 const MAX_JOIN_DISTANCE_METERS = 10;
+
+// ── Contour spatial grid ──────────────────────────────────────────────────────
+
+/** Spatial hash grid for fast nearest-contour-vertex queries in lon/lat space. */
+interface ContourGrid {
+  cells: Map<string, Array<[number, number, number]>>; // key → [lon, lat, elev]
+  cellSize: number;
+}
+
+/**
+ * Build a spatial hash grid from contour line GeoJSON features.
+ * cellSize ~0.0002° ≈ 15 m — small enough for sub-tree precision,
+ * large enough that each cell holds ~70–100 vertices.
+ */
+function buildContourGrid(
+  features: GeoJSONFeature[],
+  cellSize = 0.0002
+): ContourGrid {
+  const cells = new Map<string, Array<[number, number, number]>>();
+
+  function addVertex(lon: number, lat: number, elev: number): void {
+    const cx = Math.floor(lon / cellSize);
+    const cy = Math.floor(lat / cellSize);
+    const key = `${cx},${cy}`;
+    const cell = cells.get(key);
+    if (cell) {
+      cell.push([lon, lat, elev]);
+    } else {
+      cells.set(key, [[lon, lat, elev]]);
+    }
+  }
+
+  function visitCoords(coords: unknown, elev: number): void {
+    if (!Array.isArray(coords)) return;
+    if (
+      coords.length >= 2 &&
+      typeof coords[0] === 'number' &&
+      typeof coords[1] === 'number'
+    ) {
+      addVertex(coords[0], coords[1], elev);
+      return;
+    }
+    coords.forEach((child) => visitCoords(child, elev));
+  }
+
+  for (const feature of features) {
+    const elev = (feature.properties ?? {}).Contour as number | undefined;
+    if (typeof elev !== 'number') continue;
+    visitCoords(feature.geometry?.coordinates, elev);
+  }
+
+  return { cells, cellSize };
+}
+
+/**
+ * Return the elevation of the nearest contour vertex within a 3×3 cell
+ * neighbourhood, or `undefined` if the area has no contour data nearby.
+ */
+function nearestContourElevation(
+  lon: number,
+  lat: number,
+  grid: ContourGrid
+): number | undefined {
+  const { cells, cellSize } = grid;
+  const cx = Math.floor(lon / cellSize);
+  const cy = Math.floor(lat / cellSize);
+
+  let bestElev: number | undefined;
+  let bestDistSq = Infinity;
+
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dy = -1; dy <= 1; dy++) {
+      const cell = cells.get(`${cx + dx},${cy + dy}`);
+      if (!cell) continue;
+      for (const [vlon, vlat, elev] of cell) {
+        const dSq = (lon - vlon) * (lon - vlon) + (lat - vlat) * (lat - vlat);
+        if (dSq < bestDistSq) {
+          bestDistSq = dSq;
+          bestElev = elev;
+        }
+      }
+    }
+  }
+
+  return bestElev;
+}
 
 function numberProp(properties: Record<string, unknown>, key: string): number | undefined {
   const value = properties[key];
@@ -200,7 +298,8 @@ function treeFromFeature(
   index: number,
   area: 1 | 2,
   sourceLayer: string,
-  fieldPoints: FieldPoint3D[]
+  fieldPoints: FieldPoint3D[],
+  contourGrid: ContourGrid
 ): TreeFeature3D | undefined {
   const centroid = centroidFromGeometry(feature);
   if (!centroid) return undefined;
@@ -210,8 +309,16 @@ function treeFromFeature(
   const crownArea = numberProp(properties, 'Shape_Area') ?? numberProp(properties, 'AREA') ?? 6;
   const stressClass = stressFromMajority(majorityCode);
   const [x, y] = lonLatToUtm20N(centroid[0], centroid[1]);
+
+  // Z priority:
+  //   1. Joined field-point Ortho (GPS-measured ground truth, Area 2 only)
+  //   2. Nearest contour line vertex elevation (1 m contours, both areas)
+  //   3. Per-area statistical fallback
   const joined = area === 2 ? nearestFieldPoint(feature, centroid, fieldPoints) : undefined;
-  const z = joined?.point.scenePosition[2] ?? 230;
+  const z =
+    joined?.point.scenePosition[2] ??
+    nearestContourElevation(centroid[0], centroid[1], contourGrid) ??
+    AREA_FALLBACK_Z[area];
 
   return {
     id: `area-${area}-tree-${String(index + 1).padStart(4, '0')}`,
@@ -238,10 +345,21 @@ async function fetchGeoJSON(path: string): Promise<GeoJSONFeatureCollection> {
 }
 
 export async function loadTreeData3D(): Promise<{ trees: TreeFeature3D[]; fieldPoints: FieldPoint3D[] }> {
-  const fieldJson = await fetchGeoJSON(FIELD_POINTS_PATH);
+  // Load field points and contour grids in parallel — all are needed before trees
+  const [fieldJson, contourJson1, contourJson2] = await Promise.all([
+    fetchGeoJSON(FIELD_POINTS_PATH),
+    fetchGeoJSON(CONTOUR_SOURCES[1]),
+    fetchGeoJSON(CONTOUR_SOURCES[2]),
+  ]);
+
   const fieldPoints = fieldJson.features
     .map((feature, index) => fieldPointFromFeature(feature, index))
     .filter((point): point is FieldPoint3D => Boolean(point));
+
+  const contourGrids: Record<1 | 2, ContourGrid> = {
+    1: buildContourGrid(contourJson1.features),
+    2: buildContourGrid(contourJson2.features),
+  };
 
   const treeCollections = await Promise.all(TREE_SOURCES.map(async (source) => ({
     source,
@@ -250,7 +368,9 @@ export async function loadTreeData3D(): Promise<{ trees: TreeFeature3D[]; fieldP
 
   const trees = treeCollections.flatMap(({ source, json }) =>
     json.features
-      .map((feature, index) => treeFromFeature(feature, index, source.area, source.layer, fieldPoints))
+      .map((feature, index) =>
+        treeFromFeature(feature, index, source.area, source.layer, fieldPoints, contourGrids[source.area])
+      )
       .filter((tree): tree is TreeFeature3D => Boolean(tree))
   );
 

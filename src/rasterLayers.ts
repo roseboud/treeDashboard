@@ -20,12 +20,6 @@ function isLeafOverlay(entry: RasterCatalogEntry): boolean {
   return entry.label.toLowerCase().includes('leaf');
 }
 
-/**
- * Maps a label keyword to an RGBA color used as the "active pixel" tint for
- * leaf-classification single-band rasters.  The rasters are binary masks
- * (non-zero = classified), so we render 0 as transparent and the class color
- * at full opacity.  Colors match the STRESS_COLORS palette in utils.ts.
- */
 const LEAF_CLASS_COLORS: Array<{ keyword: string; rgba: [number, number, number, number] }> = [
   { keyword: 'green',    rgba: [58,  158, 79,  1] },
   { keyword: 'yellow',   rgba: [212, 160, 23,  1] },
@@ -48,15 +42,20 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
     });
   }
 
-  // OL WebGL style expressions require 4-element [r, g, b, a] color arrays
-  // (r/g/b 0–255, a 0–1).  The missing alpha was a silent rendering bug.
-  const isNDVI       = entry.label.toLowerCase().includes('ndvi');
-  const isLeafClass  = entry.label.toLowerCase().includes('leaf');
-  const classColor   = isLeafClass ? leafClassColor(entry.label) : undefined;
+  // All singleband COGs use normalize:false so band(1) returns the raw stored value.
+  // Without this, OL can fall back to the float32 type range (+/-3.4e38) when a COG
+  // lacks embedded min/max statistics, collapsing every pixel to 0 (solid black).
+  const rawSource = new GeoTIFF({ sources: [{ url: entry.path }], normalize: false });
+
+  const labelLower  = entry.label.toLowerCase();
+  const isNDVI      = labelLower.includes('ndvi');
+  const isLeafClass = labelLower.includes('leaf');
+  const isAspect    = labelLower.includes('aspect');
+  const classColor  = isLeafClass ? leafClassColor(entry.label) : undefined;
 
   let color: ExpressionValue;
+
   if (isNDVI) {
-    // NDVI: transparent no-data, then white (low) → red (high); input range 0–1
     color = ['case', ['>', ['band', 1], 0],
       ['interpolate', ['linear'], ['band', 1],
         0, [255, 255, 255, 1],
@@ -65,16 +64,26 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
       [0, 0, 0, 0],
     ];
   } else if (classColor) {
-    // Leaf-classification binary mask: transparent background, class color for hits
     const [r, g, b] = classColor;
     color = ['case', ['>', ['band', 1], 0],
-      [r, g, b, 0.80],   // classified pixel — stress-class color, slightly transparent
-      [0, 0, 0, 0],       // background — fully transparent
+      [r, g, b, 0.80],
+      [0, 0, 0, 0],
+    ];
+  } else if (isAspect) {
+    // Aspect stores azimuth as float32 0-360 degrees (flat areas = -1 in GDAL).
+    // Directional colours: N=blue, E=yellow, S=red-orange, W=green.
+    color = ['case', ['>', ['band', 1], 0],
+      ['interpolate', ['linear'], ['band', 1],
+          0.001, [100, 140, 220, 0.85],
+         90,     [220, 185,   0, 0.85],
+        180,     [200,  70,  40, 0.85],
+        270,     [ 40, 160,  80, 0.85],
+        360,     [100, 140, 220, 0.85],
+      ],
+      [0, 0, 0, 0],
     ];
   } else {
-    // Generic singleband (hillshade, slope, aspect, DEM, stream…):
-    // transparent no-data, then greyscale ramp. This prevents COG extents from
-    // painting black rectangles over the basemap where source pixels are empty.
+    // Generic singleband (hillshade uint8 0-255, slope, DEM hillshade, stream).
     color = ['case', ['>', ['band', 1], 0],
       ['interpolate', ['linear'], ['band', 1],
         1,   [1,   1,   1,   0.85],
@@ -84,10 +93,7 @@ function createRasterLayer(entry: RasterCatalogEntry): WebGLTileLayer {
     ];
   }
 
-  return new WebGLTileLayer({
-    source: new GeoTIFF({ sources: [{ url: entry.path }] }),
-    style: { color },
-  });
+  return new WebGLTileLayer({ source: rawSource, style: { color } });
 }
 
 export function addRasterLayerPanel(map: OLMap, panelEl: HTMLElement): DisposeRasterPanel {
